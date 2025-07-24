@@ -1,4 +1,4 @@
-import MatchScheduleScreen from "./src/screens/MatchScheduleScreen";
+// import ChampionshipTypeScreen from "./src/screens/ChampionshipTypeScreen";
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -6,6 +6,7 @@ import HomeScreen from "./src/screens/HomeScreen";
 import PlayersScreen from "./src/screens/PlayersScreen";
 import TeamsScreen from "./src/screens/TeamsScreen";
 import AssignPlayersScreen from "./src/screens/AssignPlayersScreen";
+import MatchScheduleScreen from "./src/screens/MatchScheduleScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -47,6 +48,7 @@ export default function App() {
           component={AssignPlayersScreen}
           options={{ title: "Distribuir Jogadores" }}
         />
+        {/* Removido: tela de tipo de campeonato, agora integrado na tela de jogos */}
         <Tab.Screen
           name="MatchSchedule"
           component={MatchScheduleScreen}
