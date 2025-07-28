@@ -12,17 +12,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../components/AppHeader";
-
-const COLORS = {
-  primary: "#0A2A45", // azul escuro
-  accent: "#D6B36A", // dourado
-  background: "#fff",
-  card: "#11385A",
-  cardLight: "#1C4663",
-  text: "#fff",
-  textDark: "#0A2A45",
-  error: "#e57373",
-};
+import { theme } from "../theme/theme";
 
 function shuffle(array: any[]) {
   return array.sort(() => Math.random() - 0.5);
@@ -47,11 +37,13 @@ export default function MatchScheduleScreen() {
   >([]);
 
   useEffect(() => {
-    const fetchTimes = async () => {
+    const fetchData = async () => {
       const timesSalvos = await AsyncStorage.getItem("teams");
       setTimes(timesSalvos ? JSON.parse(timesSalvos) : []);
+      const jogosSalvos = await AsyncStorage.getItem("jogos_sorteados");
+      setJogos(jogosSalvos ? JSON.parse(jogosSalvos) : []);
     };
-    if (isFocused) fetchTimes();
+    if (isFocused) fetchData();
   }, [isFocused]);
 
   const sortearJogos = () => {
@@ -103,6 +95,28 @@ export default function MatchScheduleScreen() {
     }
     setJogos(jogosGerados);
   };
+
+  // Salvar jogos sorteados manualmente
+  const salvarJogosSorteados = async () => {
+    try {
+      await AsyncStorage.setItem("jogos_sorteados", JSON.stringify(jogos));
+      setJogos([...jogos]); // Atualiza a lista imediatamente
+      alert("Jogos sorteados salvos com sucesso!");
+    } catch (e) {
+      alert("Erro ao salvar jogos sorteados");
+    }
+  };
+
+  // Remover jogos salvos
+  const removerJogosSalvos = async () => {
+    try {
+      await AsyncStorage.removeItem("jogos_sorteados");
+      setJogos([]);
+      alert("Jogos salvos removidos!");
+    } catch (e) {
+      alert("Erro ao remover jogos salvos");
+    }
+  };
   // Função para adicionar jogo manualmente
   const adicionarJogoManual = () => {
     if (
@@ -121,8 +135,8 @@ export default function MatchScheduleScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <AppHeader title="Definir Jogos" icon="calendar" />
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader title="Definir Jogos" icon="calendar" theme="light" />
       <FlatList
         data={[1]}
         renderItem={() => (
@@ -184,9 +198,33 @@ export default function MatchScheduleScreen() {
               />
             </View>
             {autoSortear ? (
-              <TouchableOpacity style={styles.sortBtn} onPress={sortearJogos}>
-                <Text style={styles.sortBtnText}>Sortear jogos</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.sortBtn} onPress={sortearJogos}>
+                  <Text style={styles.sortBtnText}>Sortear jogos</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sortBtn,
+                    { backgroundColor: theme.colors.primary, marginTop: 8 },
+                  ]}
+                  onPress={salvarJogosSorteados}
+                >
+                  <Text style={[styles.sortBtnText, { color: theme.colors.secondary }]}>
+                    Salvar jogos sorteados
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sortBtn,
+                    { backgroundColor: theme.colors.error, marginTop: 8 },
+                  ]}
+                  onPress={removerJogosSalvos}
+                >
+                  <Text style={[styles.sortBtnText, { color: theme.colors.text }]}>
+                    Remover jogos salvos
+                  </Text>
+                </TouchableOpacity>
+              </>
             ) : (
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>
@@ -326,189 +364,124 @@ export default function MatchScheduleScreen() {
 }
 
 const styles = StyleSheet.create({
-  gradientBg: {
-    flex: 1,
-    backgroundColor: COLORS.card,
-  },
   container: {
     flex: 1,
-    backgroundColor: COLORS.card,
-    margin: 16,
-    borderRadius: 18,
-    padding: 18,
-    elevation: 3,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    margin: theme.spacing.md,
+    ...theme.components.card
   },
   sectionCard: {
-    backgroundColor: COLORS.cardLight,
-    borderRadius: 12,
-    padding: 18,
-    marginBottom: 28,
-    elevation: 2,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    marginBottom: theme.spacing.lg,
+    ...theme.components.card
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.accent,
-    marginBottom: 8,
-    letterSpacing: 0.5,
+    ...theme.typography.h3,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.sm,
   },
   champTypeRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: theme.spacing.sm,
   },
   champTypeBtn: {
-    backgroundColor: COLORS.background,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    elevation: 1,
-    borderWidth: 1.5,
-    borderColor: COLORS.accent,
+    ...theme.components.button,
+    backgroundColor: theme.colors.white,
+    borderColor: theme.colors.primary,
+    borderWidth: 1,
   },
   champTypeBtnActive: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: theme.colors.primary,
   },
   champTypeText: {
-    color: COLORS.primary,
-    fontWeight: "bold",
-    fontSize: 15,
+    ...theme.typography.button,
+    color: theme.colors.primary,
   },
   champTypeTextActive: {
-    color: COLORS.text,
+    color: theme.colors.white,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: COLORS.accent,
-    padding: 10,
-    borderRadius: 8,
-    fontSize: 16,
-    color: COLORS.textDark,
-    backgroundColor: COLORS.background,
-    marginTop: 8,
+    ...theme.components.input,
+    marginTop: theme.spacing.sm,
   },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: theme.spacing.md,
     justifyContent: "space-between",
-    backgroundColor: COLORS.cardLight,
-    borderRadius: 8,
-    padding: 10,
-    elevation: 1,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.sm,
   },
   switchLabel: {
-    color: COLORS.accent,
-    fontWeight: "bold",
-    fontSize: 15,
+    ...theme.typography.label,
+    color: theme.colors.primary,
   },
   sortBtn: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 18,
-    elevation: 2,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    ...theme.components.button,
+    backgroundColor: theme.colors.primary,
+    marginBottom: theme.spacing.md,
   },
   sortBtnText: {
-    color: COLORS.primary,
-    fontSize: 18,
-    fontWeight: "bold",
-    letterSpacing: 1,
+    ...theme.typography.button,
+    color: theme.colors.white,
   },
   manualRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
-    gap: 8,
+    marginBottom: theme.spacing.sm,
+    gap: theme.spacing.sm,
   },
   manualLabel: {
-    color: COLORS.accent,
-    fontWeight: "bold",
-    fontSize: 15,
-    marginRight: 8,
+    ...theme.typography.label,
+    color: theme.colors.primary,
+    marginRight: theme.spacing.sm,
   },
   teamBtn: {
-    backgroundColor: COLORS.background,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    elevation: 1,
-    borderWidth: 1.5,
-    borderColor: COLORS.accent,
+    ...theme.components.button,
+    backgroundColor: theme.colors.white,
+    borderColor: theme.colors.primary,
+    borderWidth: 1,
   },
   teamBtnActive: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: theme.colors.primary,
   },
   teamBtnText: {
-    color: COLORS.primary,
-    fontWeight: "bold",
-    fontSize: 15,
+    ...theme.typography.button,
+    color: theme.colors.primary,
   },
   teamBtnTextActive: {
-    color: COLORS.text,
+    color: theme.colors.white,
   },
   addGameBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginTop: 8,
-    elevation: 2,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    ...theme.components.button,
+    backgroundColor: theme.colors.primary,
+    marginTop: theme.spacing.sm,
   },
   addGameBtnText: {
-    color: COLORS.accent,
-    fontSize: 16,
-    fontWeight: "bold",
-    letterSpacing: 1,
+    ...theme.typography.button,
+    color: theme.colors.white,
   },
   matchCard: {
-    backgroundColor: COLORS.cardLight,
-    borderRadius: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
-    marginBottom: 14,
-    alignItems: "center",
-    elevation: 2,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    minWidth: 0,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    alignItems: "center" as const,
     width: "100%",
-    maxWidth: 340,
-    alignSelf: "center",
+    alignSelf: "center" as const,
+    ...theme.components.card,
   },
   matchRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: theme.spacing.sm,
     width: "100%",
     flexWrap: "nowrap",
   },
   teamBox: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
     minWidth: 40,
     maxWidth: 80,
     alignItems: "center",
@@ -516,43 +489,34 @@ const styles = StyleSheet.create({
     marginHorizontal: 1,
   },
   teamName: {
-    color: COLORS.text,
+    color: theme.colors.white,
     fontWeight: "bold",
     fontSize: 13,
-    letterSpacing: 0.5,
     textAlign: "center",
     maxWidth: 70,
     overflow: "hidden",
   },
   vsText: {
-    color: COLORS.accent,
+    color: theme.colors.primary,
     fontWeight: "bold",
     fontSize: 18,
-    marginHorizontal: 6,
-    letterSpacing: 1,
+    marginHorizontal: theme.spacing.sm,
   },
   emptyText: {
     textAlign: "center",
-    color: COLORS.text,
-    fontSize: 16,
-    marginTop: 24,
+    color: theme.colors.text,
+    ...theme.typography.body,
+    marginTop: theme.spacing.lg,
   },
   scoreRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    marginTop: 8,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
   },
   scoreInput: {
-    borderWidth: 1.2,
-    borderColor: COLORS.accent,
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    fontSize: 15,
-    color: COLORS.textDark,
-    backgroundColor: COLORS.background,
+    ...theme.components.input,
     minWidth: 40,
     textAlign: "center",
   },

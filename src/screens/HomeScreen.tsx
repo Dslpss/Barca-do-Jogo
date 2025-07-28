@@ -5,20 +5,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const COLORS = {
-  primary: "#0A2A45", // azul escuro
-  accent: "#D6B36A", // dourado
-  background: "#fff",
-  card: "#11385A",
-  cardLight: "#1C4663",
-  text: "#fff",
-  textDark: "#0A2A45",
-  error: "#e57373",
-};
+import { theme } from "../theme/theme";
+import AppHeader from "../components/AppHeader";
 
 export default function HomeScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
   const [qtdJogadores, setQtdJogadores] = useState(0);
   const [qtdTimes, setQtdTimes] = useState(0);
@@ -42,24 +33,20 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient
-      colors={[COLORS.primary, COLORS.card]}
+      colors={[theme.colors.primary, theme.colors.card]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
       <View style={styles.container}>
-        <AppHeader
-          title="Barca do Jogo"
-          subtitle="Resenha é nosso JOGO"
-          icon="football"
-        >
+        <AppHeader title="Barca do Jogo" icon="football" theme="dark">
           <View style={styles.infoRow}>
             <View style={styles.infoBox}>
-              <Ionicons name="people" size={22} color={COLORS.accent} />
+              <Ionicons name="people-outline" size={20} color={theme.colors.white} />
               <Text style={styles.infoText}>{qtdJogadores} jogadores</Text>
             </View>
             <View style={styles.infoBox}>
-              <Ionicons name="shirt" size={22} color={COLORS.accent} />
+              <Ionicons name="shirt-outline" size={20} color={theme.colors.white} />
               <Text style={styles.infoText}>{qtdTimes} times</Text>
             </View>
           </View>
@@ -70,10 +57,10 @@ export default function HomeScreen() {
             onPress={() => navigation.navigate("Players")}
           >
             <Ionicons
-              name="people"
-              size={28}
-              color={COLORS.text}
-              style={{ marginRight: 8 }}
+              name="people-outline"
+              size={24}
+              color={theme.colors.primary}
+              style={{ marginRight: 12 }}
             />
             <Text style={styles.menuButtonText}>Cadastrar Jogadores</Text>
           </TouchableOpacity>
@@ -82,12 +69,36 @@ export default function HomeScreen() {
             onPress={() => navigation.navigate("Teams")}
           >
             <Ionicons
-              name="shirt"
-              size={28}
-              color={COLORS.text}
-              style={{ marginRight: 8 }}
+              name="shirt-outline"
+              size={24}
+              color={theme.colors.primary}
+              style={{ marginRight: 12 }}
             />
             <Text style={styles.menuButtonText}>Cadastrar Times</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate("AssignPlayers")}
+          >
+            <Ionicons
+              name="shuffle-outline"
+              size={24}
+              color={theme.colors.primary}
+              style={{ marginRight: 12 }}
+            />
+            <Text style={styles.menuButtonText}>Distribuir Jogadores</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate("MatchSchedule")}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={24}
+              color={theme.colors.primary}
+              style={{ marginRight: 12 }}
+            />
+            <Text style={styles.menuButtonText}>Ver Jogos</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -95,90 +106,61 @@ export default function HomeScreen() {
   );
 }
 
-import AppHeader from "../components/AppHeader";
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
-    backgroundColor: COLORS.primary, // azul escuro
   },
   container: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
-    backgroundColor: 'transparent', // sem branco
-  },
-  headerCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 32,
-    alignItems: "center",
-    elevation: 3,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: COLORS.accent,
-    marginBottom: 4,
-    letterSpacing: 1,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: COLORS.accent,
-    marginBottom: 16,
-    textAlign: "center",
-    fontWeight: "500",
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 18,
-    marginBottom: 4,
+    gap: 16,
+    marginTop: 16,
   },
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.cardLight,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 8,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    marginHorizontal: 4,
   },
   infoText: {
-    marginLeft: 6,
-    color: COLORS.text,
-    fontWeight: "bold",
+    marginLeft: 8,
+    color: theme.colors.white,
+    fontWeight: "600",
     fontSize: 15,
   },
   menuContainer: {
     width: "100%",
     alignItems: "center",
+    marginTop: 40,
   },
   menuButton: {
     flexDirection: "row",
-    backgroundColor: COLORS.accent,
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 14,
-    marginBottom: 22,
-    width: "85%",
+    backgroundColor: theme.colors.background,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 20,
+    width: "90%",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 3,
-    shadowColor: COLORS.primary,
+    elevation: 4,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   menuButtonText: {
-    color: COLORS.primary,
-    fontWeight: "bold",
-    fontSize: 18,
-    letterSpacing: 1,
+    color: theme.colors.primary,
+    fontWeight: "700",
+    fontSize: 16,
+    letterSpacing: 0.5,
   },
 });
