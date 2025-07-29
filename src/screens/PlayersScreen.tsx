@@ -213,30 +213,31 @@ export default function PlayersScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <AppHeader title="Cadastro de Jogadores" icon="people" theme="light" />
+      <ScrollView keyboardShouldPersistTaps="handled">
+        <View style={styles.card}>
+          <View style={{ alignItems: "center", width: "100%" }}>
+            <Text style={styles.title}>Cadastrar novo jogador</Text>
+          </View>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Nome do jogador"
+              value={player}
+              onChangeText={setPlayer}
+              placeholderTextColor={theme.colors.primary}
+            />
+            <TouchableOpacity style={styles.addBtn} onPress={addPlayer}>
+              <Text style={styles.addBtnText}>Adicionar</Text>
+            </TouchableOpacity>
+          </View>
+          {renderStars(playerSkill, setPlayerSkill)}
+          {renderPositionSelector(playerPosition, setPlayerPosition)}
+        </View>
+      </ScrollView>
       <FlatList
         data={players}
+        keyboardShouldPersistTaps="handled"
         keyExtractor={(item, index) => index.toString()}
-        ListHeaderComponent={() => (
-          <View style={styles.card}>
-            <View style={{ alignItems: "center", width: "100%" }}>
-              <Text style={styles.title}>Cadastrar novo jogador</Text>
-            </View>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="Nome do jogador"
-                value={player}
-                onChangeText={setPlayer}
-                placeholderTextColor={theme.colors.primary}
-              />
-              <TouchableOpacity style={styles.addBtn} onPress={addPlayer}>
-                <Text style={styles.addBtnText}>Adicionar</Text>
-              </TouchableOpacity>
-            </View>
-            {renderStars(playerSkill, setPlayerSkill)}
-            {renderPositionSelector(playerPosition, setPlayerPosition)}
-          </View>
-        )}
         renderItem={({ item, index }) => (
           <View style={styles.playerCard}>
             {editingIdx === index ? (

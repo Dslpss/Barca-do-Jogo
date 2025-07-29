@@ -100,6 +100,18 @@ export default function HomeScreen() {
             />
             <Text style={styles.menuButtonText}>Ver Jogos</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate("HistoryReports")}
+          >
+            <Ionicons
+              name="stats-chart-outline"
+              size={24}
+              color={theme.colors.primary}
+              style={{ marginRight: 12 }}
+            />
+            <Text style={styles.menuButtonText}>Histórico & Relatórios</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </LinearGradient>

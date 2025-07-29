@@ -8,6 +8,7 @@ import TeamsScreen from "./src/screens/TeamsScreen";
 import AssignPlayersScreen from "./src/screens/AssignPlayersScreen";
 import MatchScheduleScreen from "./src/screens/MatchScheduleScreen";
 import ChampionshipTypeScreen from "./src/screens/ChampionshipTypeScreen";
+import { HistoryReportsScreen } from "./src/screens/HistoryReportsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +27,10 @@ export default function App() {
         <Stack.Screen
           name="ChampionshipType"
           component={ChampionshipTypeScreen}
+        />
+        <Stack.Screen
+          name="HistoryReports"
+          component={HistoryReportsScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>
