@@ -113,6 +113,25 @@ export default function HomeScreen() {
             <Text style={styles.menuButtonText}>Histórico & Relatórios</Text>
           </TouchableOpacity>
         </View>
+        
+        {/* Card de Créditos */}
+        <LinearGradient
+          colors={['rgba(255, 255, 255, 0.95)', 'rgba(240, 248, 255, 0.9)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.creditsCard}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name="code-outline" size={22} color={theme.colors.primary} />
+          </View>
+          <View style={styles.creditsTextContainer}>
+            <Text style={styles.creditsText}>App created by</Text>
+            <Text style={styles.developerName}>DennisEmannuel</Text>
+          </View>
+          <View style={styles.devBadge}>
+            <Text style={styles.devText}>&lt;DEV&gt;</Text>
+          </View>
+        </LinearGradient>
       </View>
     </LinearGradient>
   );
@@ -174,5 +193,69 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 16,
     letterSpacing: 0.5,
+  },
+  creditsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    marginTop: 24,
+    elevation: 8,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(33, 150, 243, 0.2)",
+    transform: [{ scale: 1 }],
+  },
+  iconContainer: {
+    backgroundColor: "rgba(33, 150, 243, 0.1)",
+    padding: 8,
+    borderRadius: 12,
+    marginRight: 12,
+    elevation: 2,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  creditsTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  creditsText: {
+    color: "rgba(0, 0, 0, 0.6)",
+    fontSize: 12,
+    fontWeight: "400",
+    marginBottom: 2,
+  },
+  developerName: {
+    color: theme.colors.primary,
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textShadowColor: "rgba(33, 150, 243, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  devBadge: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    elevation: 4,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    transform: [{ rotate: "-2deg" }],
+  },
+  devText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
   },
 });
