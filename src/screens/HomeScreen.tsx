@@ -41,36 +41,43 @@ export default function HomeScreen() {
       <View style={styles.container}>
         <AppHeader
           title={
-            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-              <View style={{
-                width: 110,
-                height: 110,
-                marginBottom: 10,
-                borderRadius: 55,
-                borderWidth: 3,
-                borderColor: theme.colors.primary,
-                backgroundColor: '#fff',
-                justifyContent: 'center',
-                alignItems: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 10, height: 10 }, // sombra para direita
-                shadowOpacity: 0.8,
-                shadowRadius: 20,
-                elevation: 16,
-              }}>
+            <View style={{ alignItems: "center", justifyContent: "center" }}>
+              <View
+                style={{
+                  width: 110,
+                  height: 110,
+                  marginBottom: 10,
+                  borderRadius: 55,
+                  borderWidth: 3,
+                  borderColor: theme.colors.primary,
+                  backgroundColor: "#fff",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 10, height: 10 }, // sombra para direita
+                  shadowOpacity: 0.8,
+                  shadowRadius: 20,
+                  elevation: 16,
+                }}
+              >
                 <Image
-                  source={require('../../assets/gol.png')}
-                  style={{ width: 100, height: 100, borderRadius: 50, resizeMode: 'cover' }}
+                  source={require("../../assets/gol.png")}
+                  style={{
+                    width: 100,
+                    height: 100,
+                    borderRadius: 50,
+                    resizeMode: "cover",
+                  }}
                   accessibilityLabel="Gol"
                 />
               </View>
               <Text
                 style={{
                   fontSize: 28,
-                  fontWeight: 'bold',
+                  fontWeight: "bold",
                   color: theme.colors.primary,
                   letterSpacing: 2,
-                  textAlign: 'center',
+                  textAlign: "center",
                   textShadowColor: theme.colors.card,
                   textShadowOffset: { width: 1, height: 2 },
                   textShadowRadius: 4,
