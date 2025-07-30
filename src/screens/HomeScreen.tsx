@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useIsFocused } from "@react-navigation/native";
@@ -39,14 +39,67 @@ export default function HomeScreen() {
       style={styles.gradient}
     >
       <View style={styles.container}>
-        <AppHeader title="Barca do Jogo" icon="football" theme="dark">
+        <AppHeader
+          title={
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{
+                width: 110,
+                height: 110,
+                marginBottom: 10,
+                borderRadius: 55,
+                borderWidth: 3,
+                borderColor: theme.colors.primary,
+                backgroundColor: '#fff',
+                justifyContent: 'center',
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 10, height: 10 }, // sombra para direita
+                shadowOpacity: 0.8,
+                shadowRadius: 20,
+                elevation: 16,
+              }}>
+                <Image
+                  source={require('../../assets/gol.png')}
+                  style={{ width: 100, height: 100, borderRadius: 50, resizeMode: 'cover' }}
+                  accessibilityLabel="Gol"
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 28,
+                  fontWeight: 'bold',
+                  color: theme.colors.primary,
+                  letterSpacing: 2,
+                  textAlign: 'center',
+                  textShadowColor: theme.colors.card,
+                  textShadowOffset: { width: 1, height: 2 },
+                  textShadowRadius: 4,
+                  transform: [{ scale: 1.04 }],
+                  paddingHorizontal: 0,
+                  paddingVertical: 0,
+                }}
+              >
+                Barca Da Bola
+              </Text>
+            </View>
+          }
+          theme="dark"
+        >
           <View style={styles.infoRow}>
             <View style={styles.infoBox}>
-              <Ionicons name="people-outline" size={20} color={theme.colors.white} />
+              <Ionicons
+                name="people-outline"
+                size={20}
+                color={theme.colors.white}
+              />
               <Text style={styles.infoText}>{qtdJogadores} jogadores</Text>
             </View>
             <View style={styles.infoBox}>
-              <Ionicons name="shirt-outline" size={20} color={theme.colors.white} />
+              <Ionicons
+                name="shirt-outline"
+                size={20}
+                color={theme.colors.white}
+              />
               <Text style={styles.infoText}>{qtdTimes} times</Text>
             </View>
           </View>
@@ -113,16 +166,20 @@ export default function HomeScreen() {
             <Text style={styles.menuButtonText}>Histórico & Relatórios</Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Card de Créditos */}
         <LinearGradient
-          colors={['rgba(255, 255, 255, 0.95)', 'rgba(240, 248, 255, 0.9)']}
+          colors={["rgba(255, 255, 255, 0.95)", "rgba(240, 248, 255, 0.9)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.creditsCard}
         >
           <View style={styles.iconContainer}>
-            <Ionicons name="code-outline" size={22} color={theme.colors.primary} />
+            <Ionicons
+              name="code-outline"
+              size={22}
+              color={theme.colors.primary}
+            />
           </View>
           <View style={styles.creditsTextContainer}>
             <Text style={styles.creditsText}>App created by</Text>
