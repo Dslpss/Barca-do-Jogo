@@ -211,10 +211,13 @@ export default function TeamsScreen() {
         <SectionList
           sections={organizarTimesPorCor}
           keyExtractor={(item, index) => {
-            // Garantir que o item.id seja uma string válida, ou gerar uma chave única com o nome e índice
-            return item.id
-              ? `team-${String(item.id)}`
-              : `team-${item.name}-${index}`;
+            // Garantir que o item.id seja uma string válida e única
+            if (!item.id) {
+              console.log(`Time sem ID encontrado: ${item.name}`);
+              return `team-name-${item.name}-${index}`;
+            }
+            // Adicionar prefixo "team-" para evitar colisões com outros componentes
+            return `team-${String(item.id)}`;
           }}
           contentContainerStyle={{ paddingBottom: 24 }}
           renderSectionHeader={({ section: { title } }) => (

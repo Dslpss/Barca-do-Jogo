@@ -202,6 +202,7 @@ class DataService {
       const userId = this.getUserId();
       if (userId && (await this.isOnline())) {
         try {
+          console.log("Buscando times do Firebase...");
           const teamsRef = collection(db, "teams");
           const q = query(
             teamsRef,
@@ -214,43 +215,59 @@ class DataService {
           snapshot.forEach((doc) => {
             firebaseTeams.push({ id: doc.id, ...doc.data() } as Team);
           });
+          
+          console.log(`Encontrados ${firebaseTeams.length} times no Firebase`);
 
           // Verificar se há times que existem no local mas não no Firebase
-          // Estes podem ser novos times locais ou times excluídos no Firebase
-          const localIdsNotInFirebase = teams
-            .filter((lt) => lt.id?.includes("-")) // Filtrar apenas IDs do Firebase
-            .filter((lt) => !firebaseTeams.some((ft) => ft.id === lt.id))
-            .map((t) => t.id);
+          const firebaseIds = new Set(firebaseTeams.map(ft => ft.id));
+          const teamsToRemove = teams.filter(lt => {
+            // Se o time não está no Firebase e não é um time recém-criado
+            return lt.id && !firebaseIds.has(lt.id) && lt.id.length > 10;
+          });
 
-          // Se encontramos IDs locais que não estão no Firebase e são IDs do Firebase,
-          // significa que foram excluídos no Firebase e devemos removê-los localmente também
-          if (localIdsNotInFirebase.length > 0) {
+          // Se encontramos times locais que não estão no Firebase,
+          // vamos removê-los se tiverem IDs que parecem ser do Firebase
+          if (teamsToRemove.length > 0) {
             console.log(
-              `Removendo ${localIdsNotInFirebase.length} times que foram excluídos no Firebase`
+              `Removendo ${teamsToRemove.length} times que foram excluídos no Firebase`
             );
-            teams = teams.filter((t) => !localIdsNotInFirebase.includes(t.id));
+            teamsToRemove.forEach(t => {
+              console.log(`- Time removido: ${t.name} (ID: ${t.id})`);
+            });
+            teams = teams.filter(t => !teamsToRemove.some(tr => tr.id === t.id));
           }
 
-          // Mesclar dados locais com dados do Firebase
-          // Times com o mesmo ID serão substituídos pelos dados do Firebase
-          const mergedTeams = [
-            ...teams.filter((t) => !t.id?.includes("-")),
-            ...firebaseTeams,
-          ];
+          // Adicionar novos times do Firebase que não existem localmente
+          const localIds = new Set(teams.map(lt => lt.id));
+          const newFirebaseTeams = firebaseTeams.filter(ft => !localIds.has(ft.id));
+          
+          if (newFirebaseTeams.length > 0) {
+            console.log(`Adicionando ${newFirebaseTeams.length} novos times do Firebase`);
+            teams = [...teams, ...newFirebaseTeams];
+          }
+
+          // Atualizar times existentes com dados do Firebase
+          teams = teams.map(team => {
+            const firebaseTeam = firebaseTeams.find(ft => ft.id === team.id);
+            return firebaseTeam || team;
+          });
 
           // Remover possíveis duplicações por nome
           const uniqueTeams: Team[] = [];
           const seenNames = new Set<string>();
 
-          for (const team of mergedTeams) {
-            if (!seenNames.has(team.name)) {
+          for (const team of teams) {
+            if (!seenNames.has(team.name.toLowerCase())) {
               uniqueTeams.push(team);
-              seenNames.add(team.name);
+              seenNames.add(team.name.toLowerCase());
+            } else {
+              console.log(`Time duplicado removido: ${team.name}`);
             }
           }
 
           teams = uniqueTeams;
           await AsyncStorage.setItem("teams", JSON.stringify(teams));
+          console.log(`${teams.length} times salvos no AsyncStorage após sincronização`);
         } catch (error) {
           console.log(
             "Erro ao buscar times do Firebase, usando cache local:",
@@ -608,46 +625,49 @@ class DataService {
     const userId = this.getUserId();
     if (userId && (await this.isOnline())) {
       try {
-        // Verificar se o ID é um ID do Firebase (contém hífen)
-        if (teamId.includes("-")) {
-          console.log(`Excluindo time do Firebase com ID: ${teamId}`);
+        // Tentar excluir diretamente usando o ID fornecido
+        try {
+          console.log(`Tentando excluir diretamente do Firebase com ID: ${teamId}`);
           const teamRef = doc(db, "teams", teamId);
           await deleteDoc(teamRef);
-          console.log(`Time excluído com sucesso do Firebase`);
-        } else {
-          // Se não for um ID do Firebase, verificar se há um equivalente no Firebase
-          console.log(
-            `ID ${teamId} não é um ID do Firebase, buscando correspondência`
-          );
+          console.log(`Time excluído com sucesso do Firebase usando ID direto`);
+          return; // Se conseguiu excluir, podemos sair da função
+        } catch (error: any) {
+          console.log(`Não foi possível excluir diretamente: ${error?.message || 'Erro desconhecido'}`);
+          // Continue para as próximas tentativas
+        }
 
-          // Buscar o time com o mesmo ID no Firebase (improvável, mas possível)
+        // Buscar o time no Firebase por consulta
+        console.log("Buscando o time no Firebase por consulta...");
+        
+        // Obter o nome do time se possível
+        const localData = await AsyncStorage.getItem("teams");
+        const teams: Team[] = localData ? JSON.parse(localData) : [];
+        const teamName = teams.find(t => t.id === teamId)?.name;
+        
+        if (teamName) {
+          // Buscar por nome
+          console.log(`Buscando por nome: ${teamName}`);
           const teamsRef = collection(db, "teams");
-          const localData = await AsyncStorage.getItem("teams");
-          const teams: Team[] = localData ? JSON.parse(localData) : [];
-          const teamName = teams.find((t) => t.id === teamId)?.name;
-
-          if (teamName) {
-            console.log(`Buscando time com nome: ${teamName} no Firebase`);
-            const q = query(
-              teamsRef,
-              where("userId", "==", userId),
-              where("name", "==", teamName)
-            );
-            const snapshot = await getDocs(q);
-
-            if (!snapshot.empty) {
-              const firebaseDoc = snapshot.docs[0];
-              console.log(
-                `Time encontrado no Firebase com ID: ${firebaseDoc.id}`
-              );
-              await deleteDoc(firebaseDoc.ref);
-              console.log(`Time excluído do Firebase com sucesso`);
-            } else {
-              console.log(
-                `Nenhum time encontrado no Firebase com o nome: ${teamName}`
-              );
+          const q = query(
+            teamsRef,
+            where("userId", "==", userId),
+            where("name", "==", teamName)
+          );
+          
+          const snapshot = await getDocs(q);
+          
+          if (!snapshot.empty) {
+            for (const doc of snapshot.docs) {
+              console.log(`Excluindo time do Firebase com ID: ${doc.id}`);
+              await deleteDoc(doc.ref);
             }
+            console.log(`Time(s) excluído(s) do Firebase por nome`);
+          } else {
+            console.log(`Nenhum time encontrado no Firebase com o nome: ${teamName}`);
           }
+        } else {
+          console.log("Não foi possível determinar o nome do time para busca");
         }
       } catch (error) {
         console.log("Erro ao deletar time do Firebase:", error);
