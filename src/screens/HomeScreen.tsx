@@ -7,12 +7,14 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { theme } from "../theme/theme";
 import AppHeader from "../components/AppHeader";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
   const [qtdJogadores, setQtdJogadores] = useState(0);
   const [qtdTimes, setQtdTimes] = useState(0);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,14 +63,14 @@ export default function HomeScreen() {
                 }}
               >
                 <Image
-                  source={require("../../assets/gol.png")}
+                  source={require("../../assets/icone_login.png")}
                   style={{
                     width: 100,
                     height: 100,
                     borderRadius: 50,
-                    resizeMode: "cover",
+                    resizeMode: "contain",
                   }}
-                  accessibilityLabel="Gol"
+                  accessibilityLabel="Logo Liga Esportiva"
                 />
               </View>
               <Text
@@ -86,7 +88,7 @@ export default function HomeScreen() {
                   paddingVertical: 0,
                 }}
               >
-                Barca Da Bola
+                Liga Esportiva Lagoaçuense
               </Text>
             </View>
           }

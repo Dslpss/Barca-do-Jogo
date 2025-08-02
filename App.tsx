@@ -9,31 +9,43 @@ import AssignPlayersScreen from "./src/screens/AssignPlayersScreen";
 import MatchScheduleScreen from "./src/screens/MatchScheduleScreen";
 import ChampionshipTypeScreen from "./src/screens/ChampionshipTypeScreen";
 import { HistoryReportsScreen } from "./src/screens/HistoryReportsScreen";
+import { AuthProvider } from "./src/contexts/AuthContext";
+import { AuthGuard } from "./src/components/AuthGuard";
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{ headerShown: false }}
-      >
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Players" component={PlayersScreen} />
-        <Stack.Screen name="Teams" component={TeamsScreen} />
-        <Stack.Screen name="AssignPlayers" component={AssignPlayersScreen} />
-        <Stack.Screen name="MatchSchedule" component={MatchScheduleScreen} />
-        <Stack.Screen
-          name="ChampionshipType"
-          component={ChampionshipTypeScreen}
-        />
-        <Stack.Screen
-          name="HistoryReports"
-          component={HistoryReportsScreen}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <AuthGuard>
+        <NavigationContainer>
+          <Stack.Navigator
+            initialRouteName="Home"
+            screenOptions={{ headerShown: false }}
+          >
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Players" component={PlayersScreen} />
+            <Stack.Screen name="Teams" component={TeamsScreen} />
+            <Stack.Screen
+              name="AssignPlayers"
+              component={AssignPlayersScreen}
+            />
+            <Stack.Screen
+              name="MatchSchedule"
+              component={MatchScheduleScreen}
+            />
+            <Stack.Screen
+              name="ChampionshipType"
+              component={ChampionshipTypeScreen}
+            />
+            <Stack.Screen
+              name="HistoryReports"
+              component={HistoryReportsScreen}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </AuthGuard>
+    </AuthProvider>
   );
 }
 // ...existing code...

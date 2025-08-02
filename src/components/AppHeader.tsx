@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../contexts/AuthContext";
 
 interface AppHeaderProps {
   title: React.ReactNode;
@@ -8,6 +9,7 @@ interface AppHeaderProps {
   icon?: string;
   children?: React.ReactNode;
   theme?: "light" | "dark";
+  showLogout?: boolean;
 }
 
 export default function AppHeader({
@@ -16,9 +18,41 @@ export default function AppHeader({
   icon,
   children,
   theme = "dark",
+  showLogout = true,
 }: AppHeaderProps) {
+  const { signOut, user } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert("Sair", "Tem certeza que deseja sair do aplicativo?", [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Sair",
+        style: "destructive",
+        onPress: () => signOut(),
+      },
+    ]);
+  };
+
   return (
     <View style={styles.headerContainer}>
+      {/* Botão de logout */}
+      {showLogout && user && (
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          accessibilityLabel="Sair do aplicativo"
+        >
+          <Ionicons
+            name="log-out-outline"
+            size={24}
+            color={theme === "dark" ? "#fff" : "#185a9d"}
+          />
+        </TouchableOpacity>
+      )}
+
       {/* Só renderiza o ícone se for passado explicitamente */}
       {icon && (
         <Ionicons
@@ -64,6 +98,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 25,
     paddingBottom: 15,
+    position: "relative",
+  },
+  logoutButton: {
+    position: "absolute",
+    top: 30,
+    right: 20,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    zIndex: 10,
   },
   headerTitle: {
     fontSize: 26,
