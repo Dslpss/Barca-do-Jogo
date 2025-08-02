@@ -7,6 +7,7 @@ import {
   SavedDistribution,
 } from "../services/dataService";
 import { useAuth } from "../contexts/AuthContext";
+import { generateUniqueId } from "../utils/keyGenerator";
 
 export function useData() {
   const { user } = useAuth();
@@ -66,7 +67,7 @@ export function useData() {
   const addPlayer = async (player: Omit<Player, "id">) => {
     const newPlayer: Player = {
       ...player,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: generateUniqueId(),
     };
     const updatedPlayers = [...players, newPlayer];
     await savePlayers(updatedPlayers);
@@ -110,7 +111,7 @@ export function useData() {
   const addTeam = async (team: Omit<Team, "id">) => {
     const newTeam: Team = {
       ...team,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: generateUniqueId(),
     };
     const updatedTeams = [...teams, newTeam];
     await saveTeams(updatedTeams);
@@ -151,7 +152,7 @@ export function useData() {
   const addGameResult = async (result: Omit<GameResult, "id">) => {
     const newResult: GameResult = {
       ...result,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: generateUniqueId(),
     };
     const updatedResults = [...gameResults, newResult];
     await saveGameResults(updatedResults);
@@ -183,7 +184,7 @@ export function useData() {
   ) => {
     const newDistribution: SavedDistribution = {
       ...distribution,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: generateUniqueId(),
     };
     const updatedDistributions = [...savedDistributions, newDistribution];
     await saveSavedDistributions(updatedDistributions);

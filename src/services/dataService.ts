@@ -115,7 +115,7 @@ class DataService {
             firebasePlayers.push({ id: doc.id, ...doc.data() } as Player);
           });
 
-          // Sincronizar e salvar localmente
+          // Sempre usar os dados do Firebase como a fonte da verdade quando online
           players = firebasePlayers;
           await AsyncStorage.setItem("players", JSON.stringify(players));
         } catch (error) {
@@ -150,16 +150,37 @@ class DataService {
               createdAt: player.createdAt || serverTimestamp(),
             };
 
-            if (player.id) {
-              // Atualizar jogador existente
+            // Verificar se o player já existe no Firebase
+            if (player.id && player.id.includes("-")) {
+              // ID do Firebase - usar setDoc com merge para atualizar ou criar
               const playerRef = doc(db, "players", player.id);
-              await updateDoc(playerRef, playerData);
+              await setDoc(playerRef, playerData, { merge: true });
             } else {
-              // Criar novo jogador
-              const playerRef = doc(collection(db, "players"));
-              await setDoc(playerRef, playerData);
+              // ID local - verificar se já foi sincronizado antes
+              const playersRef = collection(db, "players");
+              const q = query(
+                playersRef,
+                where("userId", "==", userId),
+                where("name", "==", player.name)
+              );
+              const snapshot = await getDocs(q);
+
+              if (!snapshot.empty) {
+                // Jogador já existe no Firebase, atualizar
+                const existingDoc = snapshot.docs[0];
+                await updateDoc(existingDoc.ref, playerData);
+                player.id = existingDoc.id;
+              } else {
+                // Criar novo jogador
+                const newPlayerRef = doc(collection(db, "players"));
+                await setDoc(newPlayerRef, playerData);
+                player.id = newPlayerRef.id;
+              }
             }
           }
+
+          // Atualizar o cache local com os novos IDs do Firebase
+          await AsyncStorage.setItem("players", JSON.stringify(players));
         } catch (error) {
           console.log(
             "Erro ao salvar jogadores no Firebase, dados salvos localmente:",
@@ -194,7 +215,41 @@ class DataService {
             firebaseTeams.push({ id: doc.id, ...doc.data() } as Team);
           });
 
-          teams = firebaseTeams;
+          // Verificar se há times que existem no local mas não no Firebase
+          // Estes podem ser novos times locais ou times excluídos no Firebase
+          const localIdsNotInFirebase = teams
+            .filter((lt) => lt.id?.includes("-")) // Filtrar apenas IDs do Firebase
+            .filter((lt) => !firebaseTeams.some((ft) => ft.id === lt.id))
+            .map((t) => t.id);
+
+          // Se encontramos IDs locais que não estão no Firebase e são IDs do Firebase,
+          // significa que foram excluídos no Firebase e devemos removê-los localmente também
+          if (localIdsNotInFirebase.length > 0) {
+            console.log(
+              `Removendo ${localIdsNotInFirebase.length} times que foram excluídos no Firebase`
+            );
+            teams = teams.filter((t) => !localIdsNotInFirebase.includes(t.id));
+          }
+
+          // Mesclar dados locais com dados do Firebase
+          // Times com o mesmo ID serão substituídos pelos dados do Firebase
+          const mergedTeams = [
+            ...teams.filter((t) => !t.id?.includes("-")),
+            ...firebaseTeams,
+          ];
+
+          // Remover possíveis duplicações por nome
+          const uniqueTeams: Team[] = [];
+          const seenNames = new Set<string>();
+
+          for (const team of mergedTeams) {
+            if (!seenNames.has(team.name)) {
+              uniqueTeams.push(team);
+              seenNames.add(team.name);
+            }
+          }
+
+          teams = uniqueTeams;
           await AsyncStorage.setItem("teams", JSON.stringify(teams));
         } catch (error) {
           console.log(
@@ -226,14 +281,37 @@ class DataService {
               createdAt: team.createdAt || serverTimestamp(),
             };
 
-            if (team.id) {
+            // Verificar se o team já existe no Firebase
+            if (team.id && team.id.includes("-")) {
+              // ID do Firebase - usar setDoc com merge para atualizar ou criar
               const teamRef = doc(db, "teams", team.id);
-              await updateDoc(teamRef, teamData);
+              await setDoc(teamRef, teamData, { merge: true });
             } else {
-              const teamRef = doc(collection(db, "teams"));
-              await setDoc(teamRef, teamData);
+              // ID local - verificar se já foi sincronizado antes
+              const teamsRef = collection(db, "teams");
+              const q = query(
+                teamsRef,
+                where("userId", "==", userId),
+                where("name", "==", team.name)
+              );
+              const snapshot = await getDocs(q);
+
+              if (!snapshot.empty) {
+                // Time já existe no Firebase, atualizar
+                const existingDoc = snapshot.docs[0];
+                await updateDoc(existingDoc.ref, teamData);
+                team.id = existingDoc.id;
+              } else {
+                // Criar novo time
+                const newTeamRef = doc(collection(db, "teams"));
+                await setDoc(newTeamRef, teamData);
+                team.id = newTeamRef.id;
+              }
             }
           }
+
+          // Atualizar o cache local com os novos IDs do Firebase
+          await AsyncStorage.setItem("teams", JSON.stringify(teams));
         } catch (error) {
           console.log(
             "Erro ao salvar times no Firebase, dados salvos localmente:",
@@ -303,14 +381,42 @@ class DataService {
               createdAt: result.createdAt || serverTimestamp(),
             };
 
-            if (result.id) {
+            // Verificar se o result já existe no Firebase
+            if (result.id && result.id.includes("-")) {
+              // ID do Firebase - usar setDoc com merge para atualizar ou criar
               const resultRef = doc(db, "gameResults", result.id);
-              await updateDoc(resultRef, resultData);
+              await setDoc(resultRef, resultData, { merge: true });
             } else {
-              const resultRef = doc(collection(db, "gameResults"));
-              await setDoc(resultRef, resultData);
+              // ID local - verificar se já foi sincronizado antes
+              const resultsRef = collection(db, "gameResults");
+              const q = query(
+                resultsRef,
+                where("userId", "==", userId),
+                where("timeA", "==", result.timeA),
+                where("timeB", "==", result.timeB),
+                where("data", "==", result.data)
+              );
+              const snapshot = await getDocs(q);
+
+              if (!snapshot.empty) {
+                // Resultado já existe no Firebase, atualizar
+                const existingDoc = snapshot.docs[0];
+                await updateDoc(existingDoc.ref, resultData);
+                result.id = existingDoc.id;
+              } else {
+                // Criar novo resultado
+                const newResultRef = doc(collection(db, "gameResults"));
+                await setDoc(newResultRef, resultData);
+                result.id = newResultRef.id;
+              }
             }
           }
+
+          // Atualizar o cache local com os novos IDs do Firebase
+          await AsyncStorage.setItem(
+            "resultados_jogos",
+            JSON.stringify(results)
+          );
         } catch (error) {
           console.log(
             "Erro ao salvar resultados no Firebase, dados salvos localmente:",
@@ -390,18 +496,46 @@ class DataService {
               createdAt: distribution.createdAt || serverTimestamp(),
             };
 
-            if (distribution.id) {
+            // Verificar se a distribution já existe no Firebase
+            if (distribution.id && distribution.id.includes("-")) {
+              // ID do Firebase - usar setDoc com merge para atualizar ou criar
               const distributionRef = doc(
                 db,
                 "savedDistributions",
                 distribution.id
               );
-              await updateDoc(distributionRef, distributionData);
+              await setDoc(distributionRef, distributionData, { merge: true });
             } else {
-              const distributionRef = doc(collection(db, "savedDistributions"));
-              await setDoc(distributionRef, distributionData);
+              // ID local - verificar se já foi sincronizado antes
+              const distributionsRef = collection(db, "savedDistributions");
+              const q = query(
+                distributionsRef,
+                where("userId", "==", userId),
+                where("name", "==", distribution.name)
+              );
+              const snapshot = await getDocs(q);
+
+              if (!snapshot.empty) {
+                // Distribuição já existe no Firebase, atualizar
+                const existingDoc = snapshot.docs[0];
+                await updateDoc(existingDoc.ref, distributionData);
+                distribution.id = existingDoc.id;
+              } else {
+                // Criar nova distribuição
+                const newDistributionRef = doc(
+                  collection(db, "savedDistributions")
+                );
+                await setDoc(newDistributionRef, distributionData);
+                distribution.id = newDistributionRef.id;
+              }
             }
           }
+
+          // Atualizar o cache local com os novos IDs do Firebase
+          await AsyncStorage.setItem(
+            "savedDistributions",
+            JSON.stringify(distributions)
+          );
         } catch (error) {
           console.log(
             "Erro ao salvar distribuições no Firebase, dados salvos localmente:",
@@ -447,14 +581,81 @@ class DataService {
   }
 
   async deleteTeam(teamId: string): Promise<void> {
+    console.log(`Excluindo time com ID: ${teamId}`);
+
+    // Remover do AsyncStorage local imediatamente
+    try {
+      const localData = await AsyncStorage.getItem("teams");
+      let teams: Team[] = localData ? JSON.parse(localData) : [];
+      const teamBeforeDelete = teams.find((t) => t.id === teamId);
+
+      if (teamBeforeDelete) {
+        console.log(`Time encontrado para exclusão: ${teamBeforeDelete.name}`);
+      } else {
+        console.log(`Time com ID ${teamId} não encontrado no AsyncStorage`);
+      }
+
+      teams = teams.filter((t) => t.id !== teamId);
+      await AsyncStorage.setItem("teams", JSON.stringify(teams));
+      console.log(
+        `Time removido do AsyncStorage, restando ${teams.length} times`
+      );
+    } catch (error) {
+      console.log("Erro ao remover time do AsyncStorage:", error);
+    }
+
+    // Remover do Firebase se online
     const userId = this.getUserId();
     if (userId && (await this.isOnline())) {
       try {
-        const teamRef = doc(db, "teams", teamId);
-        await deleteDoc(teamRef);
+        // Verificar se o ID é um ID do Firebase (contém hífen)
+        if (teamId.includes("-")) {
+          console.log(`Excluindo time do Firebase com ID: ${teamId}`);
+          const teamRef = doc(db, "teams", teamId);
+          await deleteDoc(teamRef);
+          console.log(`Time excluído com sucesso do Firebase`);
+        } else {
+          // Se não for um ID do Firebase, verificar se há um equivalente no Firebase
+          console.log(
+            `ID ${teamId} não é um ID do Firebase, buscando correspondência`
+          );
+
+          // Buscar o time com o mesmo ID no Firebase (improvável, mas possível)
+          const teamsRef = collection(db, "teams");
+          const localData = await AsyncStorage.getItem("teams");
+          const teams: Team[] = localData ? JSON.parse(localData) : [];
+          const teamName = teams.find((t) => t.id === teamId)?.name;
+
+          if (teamName) {
+            console.log(`Buscando time com nome: ${teamName} no Firebase`);
+            const q = query(
+              teamsRef,
+              where("userId", "==", userId),
+              where("name", "==", teamName)
+            );
+            const snapshot = await getDocs(q);
+
+            if (!snapshot.empty) {
+              const firebaseDoc = snapshot.docs[0];
+              console.log(
+                `Time encontrado no Firebase com ID: ${firebaseDoc.id}`
+              );
+              await deleteDoc(firebaseDoc.ref);
+              console.log(`Time excluído do Firebase com sucesso`);
+            } else {
+              console.log(
+                `Nenhum time encontrado no Firebase com o nome: ${teamName}`
+              );
+            }
+          }
+        }
       } catch (error) {
         console.log("Erro ao deletar time do Firebase:", error);
       }
+    } else {
+      console.log(
+        `Usuário não autenticado ou offline, time não excluído do Firebase`
+      );
     }
   }
 }

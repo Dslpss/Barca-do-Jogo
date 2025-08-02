@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -11,9 +10,12 @@ import {
   SectionList,
 } from "react-native";
 import ColorPickerModal from "../components/ColorPicker";
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
+import { useData } from "../hooks/useData";
+import { Team } from "../services/dataService";
+import { generateUniqueId } from "../utils/keyGenerator";
 
 const COLETE_CORES: { [key: string]: string } = {
   "#FF0000": "Vermelho",
@@ -24,73 +26,54 @@ const COLETE_CORES: { [key: string]: string } = {
   "#FFFFFF": "Branco",
 };
 
-type Team = {
-  id: string;
-  name: string;
-  color: string;
-};
-
 export default function TeamsScreen() {
   const [team, setTeam] = useState("");
   const [color, setColor] = useState(Object.keys(COLETE_CORES)[0]);
   const [isColorPickerVisible, setIsColorPickerVisible] = useState(false);
   const [semCor, setSemCor] = useState(false);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [editTeam, setEditTeam] = useState("");
   const [editColor, setEditColor] = useState(Object.keys(COLETE_CORES)[0]);
-  const [isEditColorPickerVisible, setIsEditColorPickerVisible] = useState(false);
+  const [isEditColorPickerVisible, setIsEditColorPickerVisible] =
+    useState(false);
   const [editSemCor, setEditSemCor] = useState(false);
 
-  useEffect(() => {
-    const fetchTeams = async () => {
-      const saved = await AsyncStorage.getItem("teams");
-      if (saved) {
-        const parsedTeams = JSON.parse(saved);
-        // Garantir que todos os times tenham um ID
-        const teamsWithIds = parsedTeams.map((t: any) => {
-          if (!t.id) {
-            return { ...t, id: Date.now().toString() + Math.random().toString(36).substr(2, 9) };
-          }
-          return t;
-        });
-        setTeams(teamsWithIds);
-        // Salvar times com IDs de volta no AsyncStorage
-        if (JSON.stringify(parsedTeams) !== JSON.stringify(teamsWithIds)) {
-          await AsyncStorage.setItem("teams", JSON.stringify(teamsWithIds));
-        }
-      } else {
-        setTeams([]);
-      }
-    };
-    fetchTeams();
-  }, []);
+  // Usando o hook useData para sincronização com Firebase
+  const { teams, saveTeams, deleteTeam, isLoading } = useData();
 
   const addTeam = async () => {
     if (team.trim()) {
       const corFinal = semCor ? "" : color;
-      const newTeam = { 
-        id: Date.now().toString(), 
-        name: team.trim(), 
-        color: corFinal 
+
+      // Verificar se já existe um time com o mesmo nome
+      const timeExistente = teams.find(
+        (t) => t.name.toLowerCase() === team.trim().toLowerCase()
+      );
+      if (timeExistente) {
+        alert(`Já existe um time chamado "${team.trim()}"`);
+        return;
+      }
+
+      const newTeam: Team = {
+        id: generateUniqueId(),
+        name: team.trim(),
+        color: corFinal,
       };
       const newTeams = [...teams, newTeam];
-      setTeams(newTeams);
+      await saveTeams(newTeams);
       setTeam("");
       setColor(Object.keys(COLETE_CORES)[0]);
       setSemCor(false);
-      await AsyncStorage.setItem("teams", JSON.stringify(newTeams));
     }
   };
 
   const excluirTeam = async (id: string) => {
-    const newTeams = teams.filter(t => t.id !== id);
-    setTeams(newTeams);
-    await AsyncStorage.setItem("teams", JSON.stringify(newTeams));
+    // Usar deleteTeam do useData para garantir que o time seja deletado do Firebase também
+    await deleteTeam(id);
   };
 
   const iniciarEdicao = (id: string) => {
-    const team = teams.find(t => t.id === id);
+    const team = teams.find((t) => t.id === id);
     if (team) {
       setEditId(id);
       setEditTeam(team.name);
@@ -102,15 +85,14 @@ export default function TeamsScreen() {
   const salvarEdicao = async () => {
     if (editTeam.trim() && editId !== null) {
       const corFinal = editSemCor ? "" : editColor;
-      const newTeams = teams.map(t =>
+      const newTeams = teams.map((t) =>
         t.id === editId ? { ...t, name: editTeam.trim(), color: corFinal } : t
       );
-      setTeams(newTeams);
+      await saveTeams(newTeams);
       setEditId(null);
       setEditTeam("");
       setEditColor(Object.keys(COLETE_CORES)[0]);
       setEditSemCor(false);
-      await AsyncStorage.setItem("teams", JSON.stringify(newTeams));
     }
   };
 
@@ -123,7 +105,9 @@ export default function TeamsScreen() {
 
   const organizarTimesPorCor = useMemo(() => {
     const timesPorCor = teams.reduce((acc, team) => {
-      const nomeCor = team.color ? (COLETE_CORES[team.color.toUpperCase()] || "Cor personalizada") : "Sem cor";
+      const nomeCor = team.color
+        ? COLETE_CORES[team.color.toUpperCase()] || "Cor personalizada"
+        : "Sem cor";
       if (!acc[nomeCor]) {
         acc[nomeCor] = [];
       }
@@ -131,8 +115,10 @@ export default function TeamsScreen() {
       return acc;
     }, {} as { [key: string]: Team[] });
 
-    const sections = Object.entries(timesPorCor)
-      .map(([title, data]) => ({ title, data }));
+    const sections = Object.entries(timesPorCor).map(([title, data]) => ({
+      title,
+      data,
+    }));
 
     sections.sort((a, b) => {
       if (a.title === "Sem cor") return 1;
@@ -181,7 +167,9 @@ export default function TeamsScreen() {
                   ]}
                   onPress={() => setColor(hexColor)}
                 >
-                  <View style={[styles.colorPreview, { backgroundColor: hexColor }]} />
+                  <View
+                    style={[styles.colorPreview, { backgroundColor: hexColor }]}
+                  />
                   <Text
                     style={[
                       styles.colorText,
@@ -197,8 +185,14 @@ export default function TeamsScreen() {
                 style={[styles.colorPickerBtn]}
                 onPress={() => setIsColorPickerVisible(true)}
               >
-                <MaterialCommunityIcons name="palette" size={16} color="white" />
-                <Text style={styles.colorPickerText} numberOfLines={1}>Personalizada</Text>
+                <MaterialCommunityIcons
+                  name="palette"
+                  size={16}
+                  color="white"
+                />
+                <Text style={styles.colorPickerText} numberOfLines={1}>
+                  Personalizada
+                </Text>
               </TouchableOpacity>
             </>
           )}
@@ -216,14 +210,19 @@ export default function TeamsScreen() {
       <View style={{ flex: 1 }}>
         <SectionList
           sections={organizarTimesPorCor}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => {
+            // Garantir que o item.id seja uma string válida, ou gerar uma chave única com o nome e índice
+            return item.id
+              ? `team-${String(item.id)}`
+              : `team-${item.name}-${index}`;
+          }}
           contentContainerStyle={{ paddingBottom: 24 }}
           renderSectionHeader={({ section: { title } }) => (
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{title}</Text>
             </View>
           )}
-          renderItem={({ item }) => (
+          renderItem={({ item }) =>
             editId === item.id ? (
               <View style={styles.teamItemEdit}>
                 <TextInput
@@ -253,33 +252,47 @@ export default function TeamsScreen() {
                   </TouchableOpacity>
                   {!editSemCor && (
                     <>
-                      {Object.entries(COLETE_CORES).map(([hexColor, colorName]) => (
-                        <TouchableOpacity
-                          key={hexColor}
-                          style={[
-                            styles.colorBtn,
-                            editColor === hexColor && styles.selectedColorBtn,
-                          ]}
-                          onPress={() => setEditColor(hexColor)}
-                        >
-                          <View style={[styles.colorPreview, { backgroundColor: hexColor }]} />
-                          <Text
+                      {Object.entries(COLETE_CORES).map(
+                        ([hexColor, colorName]) => (
+                          <TouchableOpacity
+                            key={hexColor}
                             style={[
-                              styles.colorText,
-                              editColor === hexColor && styles.selectedColorText,
+                              styles.colorBtn,
+                              editColor === hexColor && styles.selectedColorBtn,
                             ]}
-                            numberOfLines={1}
+                            onPress={() => setEditColor(hexColor)}
                           >
-                            {colorName}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                            <View
+                              style={[
+                                styles.colorPreview,
+                                { backgroundColor: hexColor },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.colorText,
+                                editColor === hexColor &&
+                                  styles.selectedColorText,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {colorName}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      )}
                       <TouchableOpacity
                         style={[styles.colorPickerBtn]}
                         onPress={() => setIsEditColorPickerVisible(true)}
                       >
-                        <MaterialCommunityIcons name="palette" size={16} color="white" />
-                        <Text style={styles.colorPickerText} numberOfLines={1}>Personalizada</Text>
+                        <MaterialCommunityIcons
+                          name="palette"
+                          size={16}
+                          color="white"
+                        />
+                        <Text style={styles.colorPickerText} numberOfLines={1}>
+                          Personalizada
+                        </Text>
                       </TouchableOpacity>
                     </>
                   )}
@@ -314,27 +327,32 @@ export default function TeamsScreen() {
                   ]}
                 />
                 <Text style={styles.teamName}>{item.name}</Text>
-                <Text style={styles.teamColor}>{item.color ? (COLETE_CORES[item.color.toUpperCase()] || 'Cor personalizada') : 'Sem cor'}</Text>
+                <Text style={styles.teamColor}>
+                  {item.color
+                    ? COLETE_CORES[item.color.toUpperCase()] ||
+                      "Cor personalizada"
+                    : "Sem cor"}
+                </Text>
                 <TouchableOpacity
                   style={styles.iconBtn}
-                  onPress={() => iniciarEdicao(item.id)}
+                  onPress={() => item.id && iniciarEdicao(item.id)}
                 >
                   <Text style={styles.iconText}>✏️</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconBtn}
-                  onPress={() => excluirTeam(item.id)}
+                  onPress={() => item.id && excluirTeam(item.id)}
                 >
                   <Text style={styles.iconText}>🗑️</Text>
                 </TouchableOpacity>
               </View>
             )
-          )}
-          ListEmptyComponent={() => (
+          }
+          ListEmptyComponent={() =>
             teams.length === 0 ? (
               <Text style={styles.emptyText}>Nenhum time cadastrado.</Text>
             ) : null
-          )}
+          }
         />
       </View>
     </View>
@@ -354,24 +372,24 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
   colorPickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#667eea',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#667eea",
     borderRadius: 20,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderWidth: 2,
-    borderColor: '#667eea',
+    borderColor: "#667eea",
     gap: theme.spacing.xs,
-    shadowColor: '#667eea',
+    shadowColor: "#667eea",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
-    width: '30%',
+    width: "30%",
     minWidth: 90,
     maxWidth: 110,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginBottom: theme.spacing.sm,
   },
   colorPreview: {
@@ -379,8 +397,8 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fff',
-    shadowColor: '#000',
+    borderColor: "#fff",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
@@ -404,44 +422,51 @@ const styles = StyleSheet.create({
     ...theme.components.input,
     marginBottom: theme.spacing.sm,
   },
-  label: { ...theme.typography.label, color: theme.colors.primary, marginBottom: theme.spacing.sm },
+  label: {
+    ...theme.typography.label,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.sm,
+  },
   colorsContainerWrap: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     paddingHorizontal: theme.spacing.xs,
   },
   colorBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderWidth: 2,
-    borderColor: 'rgba(24, 90, 157, 0.2)',
+    borderColor: "rgba(24, 90, 157, 0.2)",
     gap: theme.spacing.xs,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
-    width: '30%',
+    width: "30%",
     minWidth: 90,
     maxWidth: 110,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginBottom: theme.spacing.sm,
   },
-  selectedColorBtn: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  colorText: { 
-    ...theme.typography.body, 
+  selectedColorBtn: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  colorText: {
+    ...theme.typography.body,
     color: theme.colors.text,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 11,
-    textAlign: 'center',
+    textAlign: "center",
     flexShrink: 1,
   },
   selectedColorText: { color: theme.colors.white },
@@ -459,12 +484,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-    ...theme.components.card
+    ...theme.components.card,
   },
   teamItemEdit: {
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-    ...theme.components.card
+    ...theme.components.card,
   },
   teamColorBox: {
     width: 24,
@@ -522,22 +547,22 @@ const styles = StyleSheet.create({
     ...theme.typography.button,
   },
   noColorBtn: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 20,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderWidth: 2,
-    borderColor: 'rgba(24, 90, 157, 0.3)',
-    shadowColor: '#000',
+    borderColor: "rgba(24, 90, 157, 0.3)",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
-    width: '30%',
+    width: "30%",
     minWidth: 90,
     maxWidth: 110,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   noColorBtnActive: {
@@ -547,16 +572,16 @@ const styles = StyleSheet.create({
   noColorText: {
     ...theme.typography.body,
     color: theme.colors.primary,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 11,
-    textAlign: 'center',
+    textAlign: "center",
   },
   colorPickerText: {
     ...theme.typography.body,
-    color: 'white',
-    fontWeight: '600',
+    color: "white",
+    fontWeight: "600",
     fontSize: 11,
-    textAlign: 'center',
+    textAlign: "center",
     flexShrink: 1,
   },
   noColorTextActive: {
