@@ -128,7 +128,7 @@ export function useData() {
     // Atualizar o estado local imediatamente para feedback visual
     const updatedTeams = teams.filter((t) => t.id !== teamId);
     setTeamsState(updatedTeams);
-    
+
     // Executar a remoção no Firebase em segundo plano
     try {
       await dataService.deleteTeam(teamId);

@@ -229,7 +229,9 @@ class DataService {
           snapshot.forEach((doc) => {
             const teamData = { id: doc.id, ...doc.data() } as Team;
             firebaseTeams.push(teamData);
-            console.log(`Time do Firebase: ${teamData.name} (ID: ${teamData.id})`);
+            console.log(
+              `Time do Firebase: ${teamData.name} (ID: ${teamData.id})`
+            );
           });
 
           console.log(`Encontrados ${firebaseTeams.length} times no Firebase`);
@@ -275,24 +277,28 @@ class DataService {
 
             // Verificar se o time já existe no Firebase
             let teamExists = false;
-            
+
             // Primeiro, tentar encontrar por ID se ele existe
             if (team.id) {
               try {
                 const teamRef = doc(db, "teams", team.id);
                 const teamDoc = await getDoc(teamRef);
-                
+
                 if (teamDoc.exists()) {
                   // Time já existe no Firebase com este ID, atualizar
-                  console.log(`Atualizando time existente: ${team.name} (ID: ${team.id})`);
+                  console.log(
+                    `Atualizando time existente: ${team.name} (ID: ${team.id})`
+                  );
                   await updateDoc(teamRef, teamData);
                   teamExists = true;
                 }
               } catch (error) {
-                console.log(`ID ${team.id} não é válido no Firebase, tratando como ID local`);
+                console.log(
+                  `ID ${team.id} não é válido no Firebase, tratando como ID local`
+                );
               }
             }
-            
+
             // Se não encontrou pelo ID, buscar por nome e userId
             if (!teamExists) {
               const teamsRef = collection(db, "teams");
@@ -306,7 +312,9 @@ class DataService {
               if (!snapshot.empty) {
                 // Time já existe no Firebase com outro ID, atualizar e corrigir o ID local
                 const existingDoc = snapshot.docs[0];
-                console.log(`Time encontrado no Firebase com ID diferente: ${team.name} (Firebase ID: ${existingDoc.id}, Local ID: ${team.id})`);
+                console.log(
+                  `Time encontrado no Firebase com ID diferente: ${team.name} (Firebase ID: ${existingDoc.id}, Local ID: ${team.id})`
+                );
                 await updateDoc(existingDoc.ref, teamData);
                 team.id = existingDoc.id; // Atualizar com o ID correto do Firebase
               } else {
@@ -596,27 +604,31 @@ class DataService {
 
     // Verificar se o usuário está autenticado
     const userId = this.getUserId();
-    console.log(`Usuário autenticado: ${userId ? 'Sim' : 'Não'} (ID: ${userId})`);
+    console.log(
+      `Usuário autenticado: ${userId ? "Sim" : "Não"} (ID: ${userId})`
+    );
 
     // Remover do Firebase primeiro se online
     if (userId && (await this.isOnline())) {
       try {
         console.log(`Verificando se o time existe no Firebase...`);
-        
+
         // Primeiro, tentar excluir diretamente usando o ID fornecido
         const teamRef = doc(db, "teams", teamId);
         const teamDoc = await getDoc(teamRef);
-        
+
         if (teamDoc.exists()) {
           const teamData = teamDoc.data();
           console.log(`Time encontrado no Firebase:`, teamData);
-          console.log(`UserId do time: ${teamData.userId}, UserId atual: ${userId}`);
-          
+          console.log(
+            `UserId do time: ${teamData.userId}, UserId atual: ${userId}`
+          );
+
           if (teamData.userId === userId) {
             console.log(`Excluindo time do Firebase com ID: ${teamId}`);
             await deleteDoc(teamRef);
             console.log(`Time excluído com sucesso do Firebase`);
-            
+
             // Verificar se realmente foi excluído
             const confirmDelete = await getDoc(teamRef);
             if (!confirmDelete.exists()) {
@@ -625,28 +637,29 @@ class DataService {
               console.log(`ERRO: Time ainda existe no Firebase após exclusão!`);
             }
           } else {
-            console.log(`ERRO: Time não pertence ao usuário atual. UserId do time: ${teamData.userId}, UserId atual: ${userId}`);
+            console.log(
+              `ERRO: Time não pertence ao usuário atual. UserId do time: ${teamData.userId}, UserId atual: ${userId}`
+            );
           }
         } else {
           console.log(`Time com ID ${teamId} não encontrado no Firebase`);
-          
+
           // Se não encontrou pelo ID direto, vamos buscar por query para encontrar o time correto
           console.log(`Buscando time por query no Firebase...`);
           const teamsRef = collection(db, "teams");
-          const q = query(
-            teamsRef,
-            where("userId", "==", userId)
-          );
+          const q = query(teamsRef, where("userId", "==", userId));
           const snapshot = await getDocs(q);
-          
-          console.log(`Encontrados ${snapshot.docs.length} times do usuário no Firebase`);
-          
+
+          console.log(
+            `Encontrados ${snapshot.docs.length} times do usuário no Firebase`
+          );
+
           // Verificar se algum dos times tem o mesmo ID ou nome
           let teamFound = false;
           snapshot.forEach((doc) => {
             const data = doc.data();
             console.log(`Time encontrado: ${data.name} (ID: ${doc.id})`);
-            
+
             // Se encontrou um time com o mesmo ID local, excluir
             if (doc.id === teamId || String(data.id) === String(teamId)) {
               console.log(`Excluindo time encontrado por query: ${data.name}`);
@@ -654,18 +667,24 @@ class DataService {
               teamFound = true;
             }
           });
-          
+
           if (!teamFound) {
             console.log(`Nenhum time correspondente encontrado no Firebase`);
           }
         }
       } catch (error: any) {
-        console.log(`Erro ao deletar time do Firebase: ${error?.message || "Erro desconhecido"}`);
+        console.log(
+          `Erro ao deletar time do Firebase: ${
+            error?.message || "Erro desconhecido"
+          }`
+        );
         console.log(`Detalhes do erro:`, error);
       }
     } else {
       if (!userId) {
-        console.log(`Usuário não autenticado, não é possível excluir do Firebase`);
+        console.log(
+          `Usuário não autenticado, não é possível excluir do Firebase`
+        );
       } else {
         console.log(`Dispositivo offline, não é possível excluir do Firebase`);
       }
@@ -675,17 +694,21 @@ class DataService {
     try {
       const localData = await AsyncStorage.getItem("teams");
       let teams: Team[] = localData ? JSON.parse(localData) : [];
-      const teamBeforeDelete = teams.find(t => t.id === teamId);
-      
+      const teamBeforeDelete = teams.find((t) => t.id === teamId);
+
       if (teamBeforeDelete) {
-        console.log(`Time encontrado no AsyncStorage: ${teamBeforeDelete.name}`);
+        console.log(
+          `Time encontrado no AsyncStorage: ${teamBeforeDelete.name}`
+        );
       } else {
         console.log(`Time com ID ${teamId} não encontrado no AsyncStorage`);
       }
-      
+
       teams = teams.filter((t) => t.id !== teamId);
       await AsyncStorage.setItem("teams", JSON.stringify(teams));
-      console.log(`Time removido do AsyncStorage, restando ${teams.length} times`);
+      console.log(
+        `Time removido do AsyncStorage, restando ${teams.length} times`
+      );
     } catch (error) {
       console.log("Erro ao remover time do AsyncStorage:", error);
     }
