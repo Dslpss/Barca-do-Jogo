@@ -65,6 +65,7 @@ export interface SavedDistribution {
 
 class DataService {
   private user: User | null = null;
+  private isLoadingTeams = false;
 
   constructor() {
     // Escutar mudanças de autenticação
@@ -195,6 +196,19 @@ class DataService {
 
   // TEAMS
   async getTeams(): Promise<Team[]> {
+    // Evitar múltiplas chamadas simultâneas
+    if (this.isLoadingTeams) {
+      console.log("Já carregando times, aguardando...");
+      // Aguardar um pouco e tentar novamente
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (this.isLoadingTeams) {
+        const localData = await AsyncStorage.getItem("teams");
+        return localData ? JSON.parse(localData) : [];
+      }
+    }
+
+    this.isLoadingTeams = true;
+    
     try {
       const localData = await AsyncStorage.getItem("teams");
       let teams: Team[] = localData ? JSON.parse(localData) : [];
@@ -215,59 +229,16 @@ class DataService {
           snapshot.forEach((doc) => {
             firebaseTeams.push({ id: doc.id, ...doc.data() } as Team);
           });
-          
+
           console.log(`Encontrados ${firebaseTeams.length} times no Firebase`);
 
-          // Verificar se há times que existem no local mas não no Firebase
-          const firebaseIds = new Set(firebaseTeams.map(ft => ft.id));
-          const teamsToRemove = teams.filter(lt => {
-            // Se o time não está no Firebase e não é um time recém-criado
-            return lt.id && !firebaseIds.has(lt.id) && lt.id.length > 10;
-          });
-
-          // Se encontramos times locais que não estão no Firebase,
-          // vamos removê-los se tiverem IDs que parecem ser do Firebase
-          if (teamsToRemove.length > 0) {
-            console.log(
-              `Removendo ${teamsToRemove.length} times que foram excluídos no Firebase`
-            );
-            teamsToRemove.forEach(t => {
-              console.log(`- Time removido: ${t.name} (ID: ${t.id})`);
-            });
-            teams = teams.filter(t => !teamsToRemove.some(tr => tr.id === t.id));
-          }
-
-          // Adicionar novos times do Firebase que não existem localmente
-          const localIds = new Set(teams.map(lt => lt.id));
-          const newFirebaseTeams = firebaseTeams.filter(ft => !localIds.has(ft.id));
+          // Usar os times do Firebase como fonte da verdade quando online
+          teams = firebaseTeams;
           
-          if (newFirebaseTeams.length > 0) {
-            console.log(`Adicionando ${newFirebaseTeams.length} novos times do Firebase`);
-            teams = [...teams, ...newFirebaseTeams];
-          }
-
-          // Atualizar times existentes com dados do Firebase
-          teams = teams.map(team => {
-            const firebaseTeam = firebaseTeams.find(ft => ft.id === team.id);
-            return firebaseTeam || team;
-          });
-
-          // Remover possíveis duplicações por nome
-          const uniqueTeams: Team[] = [];
-          const seenNames = new Set<string>();
-
-          for (const team of teams) {
-            if (!seenNames.has(team.name.toLowerCase())) {
-              uniqueTeams.push(team);
-              seenNames.add(team.name.toLowerCase());
-            } else {
-              console.log(`Time duplicado removido: ${team.name}`);
-            }
-          }
-
-          teams = uniqueTeams;
           await AsyncStorage.setItem("teams", JSON.stringify(teams));
-          console.log(`${teams.length} times salvos no AsyncStorage após sincronização`);
+          console.log(
+            `${teams.length} times salvos no AsyncStorage após sincronização`
+          );
         } catch (error) {
           console.log(
             "Erro ao buscar times do Firebase, usando cache local:",
@@ -280,6 +251,8 @@ class DataService {
     } catch (error) {
       console.error("Erro ao buscar times:", error);
       return [];
+    } finally {
+      this.isLoadingTeams = false;
     }
   }
 
@@ -600,82 +573,28 @@ class DataService {
   async deleteTeam(teamId: string): Promise<void> {
     console.log(`Excluindo time com ID: ${teamId}`);
 
-    // Remover do AsyncStorage local imediatamente
-    try {
-      const localData = await AsyncStorage.getItem("teams");
-      let teams: Team[] = localData ? JSON.parse(localData) : [];
-      const teamBeforeDelete = teams.find((t) => t.id === teamId);
-
-      if (teamBeforeDelete) {
-        console.log(`Time encontrado para exclusão: ${teamBeforeDelete.name}`);
-      } else {
-        console.log(`Time com ID ${teamId} não encontrado no AsyncStorage`);
-      }
-
-      teams = teams.filter((t) => t.id !== teamId);
-      await AsyncStorage.setItem("teams", JSON.stringify(teams));
-      console.log(
-        `Time removido do AsyncStorage, restando ${teams.length} times`
-      );
-    } catch (error) {
-      console.log("Erro ao remover time do AsyncStorage:", error);
-    }
-
-    // Remover do Firebase se online
+    // Remover do Firebase primeiro se online
     const userId = this.getUserId();
     if (userId && (await this.isOnline())) {
       try {
-        // Tentar excluir diretamente usando o ID fornecido
-        try {
-          console.log(`Tentando excluir diretamente do Firebase com ID: ${teamId}`);
-          const teamRef = doc(db, "teams", teamId);
-          await deleteDoc(teamRef);
-          console.log(`Time excluído com sucesso do Firebase usando ID direto`);
-          return; // Se conseguiu excluir, podemos sair da função
-        } catch (error: any) {
-          console.log(`Não foi possível excluir diretamente: ${error?.message || 'Erro desconhecido'}`);
-          // Continue para as próximas tentativas
-        }
-
-        // Buscar o time no Firebase por consulta
-        console.log("Buscando o time no Firebase por consulta...");
-        
-        // Obter o nome do time se possível
-        const localData = await AsyncStorage.getItem("teams");
-        const teams: Team[] = localData ? JSON.parse(localData) : [];
-        const teamName = teams.find(t => t.id === teamId)?.name;
-        
-        if (teamName) {
-          // Buscar por nome
-          console.log(`Buscando por nome: ${teamName}`);
-          const teamsRef = collection(db, "teams");
-          const q = query(
-            teamsRef,
-            where("userId", "==", userId),
-            where("name", "==", teamName)
-          );
-          
-          const snapshot = await getDocs(q);
-          
-          if (!snapshot.empty) {
-            for (const doc of snapshot.docs) {
-              console.log(`Excluindo time do Firebase com ID: ${doc.id}`);
-              await deleteDoc(doc.ref);
-            }
-            console.log(`Time(s) excluído(s) do Firebase por nome`);
-          } else {
-            console.log(`Nenhum time encontrado no Firebase com o nome: ${teamName}`);
-          }
-        } else {
-          console.log("Não foi possível determinar o nome do time para busca");
-        }
-      } catch (error) {
-        console.log("Erro ao deletar time do Firebase:", error);
+        console.log(`Excluindo time do Firebase com ID: ${teamId}`);
+        const teamRef = doc(db, "teams", teamId);
+        await deleteDoc(teamRef);
+        console.log(`Time excluído com sucesso do Firebase`);
+      } catch (error: any) {
+        console.log(`Erro ao deletar time do Firebase: ${error?.message || 'Erro desconhecido'}`);
       }
-    } else {
-      console.log(
-        `Usuário não autenticado ou offline, time não excluído do Firebase`
-      );
+    }
+
+    // Remover do AsyncStorage local
+    try {
+      const localData = await AsyncStorage.getItem("teams");
+      let teams: Team[] = localData ? JSON.parse(localData) : [];
+      teams = teams.filter((t) => t.id !== teamId);
+      await AsyncStorage.setItem("teams", JSON.stringify(teams));
+      console.log(`Time removido do AsyncStorage, restando ${teams.length} times`);
+    } catch (error) {
+      console.log("Erro ao remover time do AsyncStorage:", error);
     }
   }
 }

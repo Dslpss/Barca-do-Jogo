@@ -125,9 +125,20 @@ export function useData() {
   };
 
   const deleteTeam = async (teamId: string) => {
+    // Atualizar o estado local imediatamente para feedback visual
     const updatedTeams = teams.filter((t) => t.id !== teamId);
-    await saveTeams(updatedTeams);
-    await dataService.deleteTeam(teamId);
+    setTeamsState(updatedTeams);
+    
+    // Executar a remoção no Firebase em segundo plano
+    try {
+      await dataService.deleteTeam(teamId);
+      // Recarregar os dados do Firebase após a exclusão
+      await loadTeams();
+    } catch (error) {
+      console.error("Erro ao deletar time:", error);
+      // Reverter o estado local em caso de erro
+      setTeamsState(teams);
+    }
   };
 
   // Game Results methods
