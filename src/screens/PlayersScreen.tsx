@@ -9,11 +9,13 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  Alert,
 } from "react-native";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
 import { useData } from "../hooks/useData";
 import { Player } from "../services/dataService";
+import { validateCPF, formatCPF, cleanCPF } from "../utils/cpfValidator";
 
 // Lista de posições disponíveis
 const POSITIONS = [
@@ -27,20 +29,41 @@ const POSITIONS = [
 
 export default function PlayersScreen() {
   const [player, setPlayer] = useState("");
+  const [playerCPF, setPlayerCPF] = useState("");
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [editingCPF, setEditingCPF] = useState("");
   const [editingSkill, setEditingSkill] = useState<number>(3);
   const [editingPosition, setEditingPosition] = useState<string>("Qualquer");
   const [playerSkill, setPlayerSkill] = useState<number>(3);
   const [playerPosition, setPlayerPosition] = useState<string>("Qualquer");
 
   // Usando o hook useData para sincronização com Firebase
-  const { players, savePlayers, isLoading } = useData();
+  const { players, savePlayers, deletePlayer: removePlayer, isLoading } = useData();
 
   const addPlayer = async () => {
     if (player.trim()) {
+      // Validar CPF se fornecido
+      if (playerCPF.trim() && !validateCPF(playerCPF)) {
+        Alert.alert("CPF Inválido", "Por favor, digite um CPF válido.");
+        return;
+      }
+
+      // Verificar se CPF já existe
+      if (playerCPF.trim()) {
+        const cpfLimpo = cleanCPF(playerCPF);
+        const cpfExistente = players.find(
+          (p) => p.cpf && cleanCPF(p.cpf) === cpfLimpo
+        );
+        if (cpfExistente) {
+          Alert.alert("CPF já cadastrado", `O CPF ${formatCPF(playerCPF)} já está cadastrado para o jogador "${cpfExistente.name}".`);
+          return;
+        }
+      }
+
       const newPlayer: Player = {
         name: player.trim(),
+        cpf: playerCPF.trim() ? cleanCPF(playerCPF) : undefined,
         skill: playerSkill,
         position: playerPosition,
         yellowCards: 0,
@@ -49,6 +72,7 @@ export default function PlayersScreen() {
       const newPlayers = [...players, newPlayer];
       await savePlayers(newPlayers);
       setPlayer("");
+      setPlayerCPF("");
       setPlayerSkill(3);
       setPlayerPosition("Qualquer");
     }
@@ -57,22 +81,43 @@ export default function PlayersScreen() {
   const startEditPlayer = (idx: number) => {
     setEditingIdx(idx);
     setEditingName(players[idx].name);
+    setEditingCPF(players[idx].cpf ? formatCPF(players[idx].cpf!) : "");
     setEditingSkill(players[idx].skill);
     setEditingPosition(players[idx].position);
   };
 
   const saveEditPlayer = async () => {
     if (editingIdx !== null && editingName.trim()) {
+      // Validar CPF se fornecido
+      if (editingCPF.trim() && !validateCPF(editingCPF)) {
+        Alert.alert("CPF Inválido", "Por favor, digite um CPF válido.");
+        return;
+      }
+
+      // Verificar se CPF já existe em outro jogador
+      if (editingCPF.trim()) {
+        const cpfLimpo = cleanCPF(editingCPF);
+        const cpfExistente = players.find(
+          (p, index) => p.cpf && cleanCPF(p.cpf) === cpfLimpo && index !== editingIdx
+        );
+        if (cpfExistente) {
+          Alert.alert("CPF já cadastrado", `O CPF ${formatCPF(editingCPF)} já está cadastrado para o jogador "${cpfExistente.name}".`);
+          return;
+        }
+      }
+
       const newPlayers = [...players];
       newPlayers[editingIdx] = {
         ...players[editingIdx], // Mantém os valores existentes, incluindo cartões
         name: editingName.trim(),
+        cpf: editingCPF.trim() ? cleanCPF(editingCPF) : undefined,
         skill: editingSkill,
         position: editingPosition,
       };
       await savePlayers(newPlayers);
       setEditingIdx(null);
       setEditingName("");
+      setEditingCPF("");
       setEditingSkill(3); // Resetar para o valor médio padrão
       setEditingPosition("Qualquer"); // Resetar para a posição padrão
     }
@@ -81,13 +126,21 @@ export default function PlayersScreen() {
   const cancelEditPlayer = () => {
     setEditingIdx(null);
     setEditingName("");
+    setEditingCPF("");
     setEditingSkill(3); // Resetar para o valor médio padrão
     setEditingPosition("Qualquer"); // Resetar para a posição padrão
   };
 
   const deletePlayer = async (idx: number) => {
-    const newPlayers = players.filter((_, i) => i !== idx);
-    await savePlayers(newPlayers);
+    const player = players[idx];
+    if (player && player.id) {
+      // Usar a função deletePlayer do useData que remove do Firebase também
+      await removePlayer(player.id);
+    } else {
+      // Fallback para jogadores sem ID (apenas local)
+      const newPlayers = players.filter((_, i) => i !== idx);
+      await savePlayers(newPlayers);
+    }
     if (editingIdx === idx) cancelEditPlayer();
   };
 
@@ -176,6 +229,17 @@ export default function PlayersScreen() {
               <Text style={styles.addBtnText}>Adicionar</Text>
             </TouchableOpacity>
           </View>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="CPF (opcional)"
+              value={playerCPF}
+              onChangeText={(text) => setPlayerCPF(formatCPF(text))}
+              placeholderTextColor={theme.colors.primary}
+              keyboardType="numeric"
+              maxLength={14}
+            />
+          </View>
           {renderStars(playerSkill, setPlayerSkill)}
           {renderPositionSelector(playerPosition, setPlayerPosition)}
         </View>
@@ -210,6 +274,21 @@ export default function PlayersScreen() {
                     placeholder="Novo nome"
                     placeholderTextColor={theme.colors.primary}
                   />
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        marginRight: 8,
+                        backgroundColor: theme.colors.background,
+                      },
+                    ]}
+                    value={editingCPF}
+                    onChangeText={(text) => setEditingCPF(formatCPF(text))}
+                    placeholder="CPF (opcional)"
+                    placeholderTextColor={theme.colors.primary}
+                    keyboardType="numeric"
+                    maxLength={14}
+                  />
                   {renderStars(editingSkill, setEditingSkill)}
                   {renderPositionSelector(editingPosition, setEditingPosition)}
                 </View>
@@ -238,6 +317,9 @@ export default function PlayersScreen() {
               >
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName}>{item.name}</Text>
+                  {item.cpf && (
+                    <Text style={styles.playerCPF}>CPF: {formatCPF(item.cpf)}</Text>
+                  )}
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <Text style={styles.positionText}>{item.position}</Text>
                     <View style={styles.skillStars}>
@@ -427,6 +509,12 @@ const styles = StyleSheet.create({
     ...theme.typography.h3,
     color: theme.colors.primary,
     marginBottom: theme.spacing.xs,
+  },
+  playerCPF: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    fontStyle: "italic",
   },
   positionText: {
     ...theme.typography.body,

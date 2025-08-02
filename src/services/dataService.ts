@@ -20,6 +20,7 @@ import { User } from "firebase/auth";
 export interface Player {
   id?: string;
   name: string;
+  cpf?: string;
   skill: number;
   position: string;
   yellowCards: number;
@@ -588,14 +589,85 @@ class DataService {
 
   // DELETE METHODS
   async deletePlayer(playerId: string): Promise<void> {
+    console.log(`Excluindo jogador com ID: ${playerId}`);
+    
     const userId = this.getUserId();
+    
+    // Remover do Firebase se online e autenticado
     if (userId && (await this.isOnline())) {
       try {
+        console.log(`Verificando se o jogador existe no Firebase...`);
+        
+        // Primeiro, tentar excluir diretamente usando o ID fornecido
         const playerRef = doc(db, "players", playerId);
-        await deleteDoc(playerRef);
-      } catch (error) {
-        console.log("Erro ao deletar jogador do Firebase:", error);
+        const playerDoc = await getDoc(playerRef);
+        
+        if (playerDoc.exists()) {
+          const playerData = playerDoc.data();
+          console.log(`Jogador encontrado no Firebase:`, playerData);
+          
+          if (playerData.userId === userId) {
+            console.log(`Excluindo jogador do Firebase com ID: ${playerId}`);
+            await deleteDoc(playerRef);
+            console.log(`Jogador excluído com sucesso do Firebase`);
+            
+            // Verificar se realmente foi excluído
+            const confirmDelete = await getDoc(playerRef);
+            if (!confirmDelete.exists()) {
+              console.log(`Confirmado: Jogador foi excluído do Firebase`);
+            } else {
+              console.log(`ERRO: Jogador ainda existe no Firebase após exclusão!`);
+            }
+          } else {
+            console.log(`ERRO: Jogador não pertence ao usuário atual`);
+          }
+        } else {
+          console.log(`Jogador com ID ${playerId} não encontrado no Firebase`);
+          
+          // Se não encontrou pelo ID direto, buscar por query
+          console.log(`Buscando jogador por query no Firebase...`);
+          const playersRef = collection(db, "players");
+          const q = query(playersRef, where("userId", "==", userId));
+          const snapshot = await getDocs(q);
+          
+          let playerFound = false;
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            if (doc.id === playerId || String(data.id) === String(playerId)) {
+              console.log(`Excluindo jogador encontrado por query: ${data.name}`);
+              deleteDoc(doc.ref);
+              playerFound = true;
+            }
+          });
+          
+          if (!playerFound) {
+            console.log(`Nenhum jogador correspondente encontrado no Firebase`);
+          }
+        }
+      } catch (error: any) {
+        console.log(`Erro ao deletar jogador do Firebase: ${error?.message || "Erro desconhecido"}`);
       }
+    } else {
+      console.log(`Usuário não autenticado ou offline, não é possível excluir do Firebase`);
+    }
+    
+    // Remover do AsyncStorage local
+    try {
+      const localData = await AsyncStorage.getItem("players");
+      let players: Player[] = localData ? JSON.parse(localData) : [];
+      const playerBeforeDelete = players.find((p) => p.id === playerId);
+      
+      if (playerBeforeDelete) {
+        console.log(`Jogador encontrado no AsyncStorage: ${playerBeforeDelete.name}`);
+      } else {
+        console.log(`Jogador com ID ${playerId} não encontrado no AsyncStorage`);
+      }
+      
+      players = players.filter((p) => p.id !== playerId);
+      await AsyncStorage.setItem("players", JSON.stringify(players));
+      console.log(`Jogador removido do AsyncStorage, restando ${players.length} jogadores`);
+    } catch (error) {
+      console.log("Erro ao remover jogador do AsyncStorage:", error);
     }
   }
 

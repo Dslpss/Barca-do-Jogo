@@ -84,9 +84,20 @@ export function useData() {
   };
 
   const deletePlayer = async (playerId: string) => {
+    // Atualizar o estado local imediatamente para feedback visual
     const updatedPlayers = players.filter((p) => p.id !== playerId);
-    await savePlayers(updatedPlayers);
-    await dataService.deletePlayer(playerId);
+    setPlayersState(updatedPlayers);
+    
+    // Executar a remoção no Firebase em segundo plano
+    try {
+      await dataService.deletePlayer(playerId);
+      // Recarregar os dados do Firebase após a exclusão
+      await loadPlayers();
+    } catch (error) {
+      console.error("Erro ao deletar jogador:", error);
+      // Reverter o estado local em caso de erro
+      setPlayersState(players);
+    }
   };
 
   // Teams methods
