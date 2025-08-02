@@ -10,6 +10,9 @@ interface AppHeaderProps {
   children?: React.ReactNode;
   theme?: "light" | "dark";
   showLogout?: boolean;
+  showSync?: boolean;
+  onSync?: () => void;
+  syncLoading?: boolean;
 }
 
 export default function AppHeader({
@@ -19,6 +22,9 @@ export default function AppHeader({
   children,
   theme = "dark",
   showLogout = true,
+  showSync = false,
+  onSync,
+  syncLoading = false,
 }: AppHeaderProps) {
   const { signOut, user } = useAuth();
 
@@ -36,22 +42,48 @@ export default function AppHeader({
     ]);
   };
 
+  const handleSync = () => {
+    if (onSync && !syncLoading) {
+      onSync();
+    }
+  };
+
   return (
     <View style={styles.headerContainer}>
-      {/* Botão de logout */}
-      {showLogout && user && (
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          accessibilityLabel="Sair do aplicativo"
-        >
-          <Ionicons
-            name="log-out-outline"
-            size={24}
-            color={theme === "dark" ? "#fff" : "#185a9d"}
-          />
-        </TouchableOpacity>
-      )}
+      {/* Botões superiores */}
+      <View style={styles.headerButtons}>
+        {/* Botão de sincronização */}
+        {showSync && user && onSync && (
+          <TouchableOpacity
+            style={[styles.headerButton, styles.syncButton]}
+            onPress={handleSync}
+            disabled={syncLoading}
+            accessibilityLabel="Sincronizar dados"
+          >
+            <Ionicons
+              name={syncLoading ? "sync" : "cloud-upload-outline"}
+              size={20}
+              color={theme === "dark" ? "#fff" : "#185a9d"}
+              style={syncLoading ? { transform: [{ rotate: "360deg" }] } : {}}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Botão de logout */}
+        {showLogout && user && (
+          <TouchableOpacity
+            style={[styles.headerButton, styles.logoutButton]}
+            onPress={handleLogout}
+            accessibilityLabel="Sair do aplicativo"
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={20}
+              color={theme === "dark" ? "#fff" : "#185a9d"}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Só renderiza o ícone se for passado explicitamente */}
       {icon && (
@@ -100,14 +132,24 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     position: "relative",
   },
-  logoutButton: {
+  headerButtons: {
     position: "absolute",
     top: 30,
     right: 20,
+    flexDirection: "row",
+    gap: 10,
+    zIndex: 10,
+  },
+  headerButton: {
     padding: 8,
     borderRadius: 20,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    zIndex: 10,
+  },
+  syncButton: {
+    // Estilos específicos do botão de sincronização se necessário
+  },
+  logoutButton: {
+    // Estilos específicos do botão de logout se necessário
   },
   headerTitle: {
     fontSize: 26,

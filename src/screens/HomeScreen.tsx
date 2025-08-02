@@ -4,34 +4,34 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { theme } from "../theme/theme";
 import AppHeader from "../components/AppHeader";
+import SyncStatus from "../components/SyncStatus";
 import { useAuth } from "../contexts/AuthContext";
+import { useData } from "../hooks/useData";
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
-  const [qtdJogadores, setQtdJogadores] = useState(0);
-  const [qtdTimes, setQtdTimes] = useState(0);
   const { user } = useAuth();
+  const { players, teams, isLoading, isOnline, loadAllData, syncData } =
+    useData();
+  const [lastSync, setLastSync] = useState<Date | undefined>();
 
   useEffect(() => {
-    const fetchData = async () => {
-      const jogadores = await AsyncStorage.getItem("players");
-      const times = await AsyncStorage.getItem("teams");
-      try {
-        const arrJogadores = jogadores ? JSON.parse(jogadores) : [];
-        const arrTimes = times ? JSON.parse(times) : [];
-        setQtdJogadores(Array.isArray(arrJogadores) ? arrJogadores.length : 0);
-        setQtdTimes(Array.isArray(arrTimes) ? arrTimes.length : 0);
-      } catch {
-        setQtdJogadores(0);
-        setQtdTimes(0);
-      }
-    };
-    fetchData();
-  }, [isFocused]);
+    if (isFocused && user) {
+      loadAllData();
+    }
+  }, [isFocused, user]);
+
+  const handleSync = async () => {
+    try {
+      await syncData();
+      setLastSync(new Date());
+    } catch (error) {
+      console.error("Erro na sincronização manual:", error);
+    }
+  };
 
   return (
     <LinearGradient
@@ -93,6 +93,9 @@ export default function HomeScreen() {
             </View>
           }
           theme="dark"
+          showSync={true}
+          onSync={handleSync}
+          syncLoading={isLoading}
         >
           <View style={styles.infoRow}>
             <View style={styles.infoBox}>
@@ -101,7 +104,9 @@ export default function HomeScreen() {
                 size={20}
                 color={theme.colors.white}
               />
-              <Text style={styles.infoText}>{qtdJogadores} jogadores</Text>
+              <Text style={styles.infoText}>
+                {isLoading ? "..." : players.length} jogadores
+              </Text>
             </View>
             <View style={styles.infoBox}>
               <Ionicons
@@ -109,9 +114,26 @@ export default function HomeScreen() {
                 size={20}
                 color={theme.colors.white}
               />
-              <Text style={styles.infoText}>{qtdTimes} times</Text>
+              <Text style={styles.infoText}>
+                {isLoading ? "..." : teams.length} times
+              </Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Ionicons
+                name="cloud-outline"
+                size={20}
+                color={theme.colors.white}
+              />
+              <Text style={styles.infoText}>{user ? "Online" : "Offline"}</Text>
             </View>
           </View>
+
+          {/* Status de sincronização */}
+          <SyncStatus
+            isOnline={!!user && isOnline}
+            isLoading={isLoading}
+            lastSync={lastSync}
+          />
         </AppHeader>
         <View style={styles.menuContainer}>
           <TouchableOpacity
