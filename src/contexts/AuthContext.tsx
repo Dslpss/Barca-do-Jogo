@@ -5,6 +5,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
 } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "../config/firebaseConfig";
 
 interface AuthContextType {
@@ -35,6 +36,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Verificar se há dados de autenticação salvos localmente
+    const checkStoredAuth = async () => {
+      try {
+        const storedEmail = await AsyncStorage.getItem("userEmail");
+        const storedPassword = await AsyncStorage.getItem("userPassword");
+
+        if (storedEmail && storedPassword) {
+          // Tentar fazer login silencioso
+          await signInWithEmailAndPassword(auth, storedEmail, storedPassword);
+        }
+      } catch (error) {
+        // Se falhar, limpar dados armazenados
+        await AsyncStorage.multiRemove(["userEmail", "userPassword"]);
+      }
+    };
+
+    checkStoredAuth();
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
@@ -47,7 +66,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setError(null);
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+
+      // Salvar credenciais para persistência
+      await AsyncStorage.setItem("userEmail", email);
+      await AsyncStorage.setItem("userPassword", password);
     } catch (error: any) {
       let errorMessage = "Erro ao fazer login";
 
@@ -78,6 +101,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = async () => {
     try {
       setError(null);
+      // Limpar dados salvos
+      await AsyncStorage.multiRemove(["userEmail", "userPassword"]);
       await firebaseSignOut(auth);
     } catch (error) {
       setError("Erro ao fazer logout");
