@@ -14,8 +14,15 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { players, teams, isLoading, isOnline, loadAllData, syncData } =
-    useData();
+  const {
+    players,
+    teams,
+    gameResults,
+    isLoading,
+    isOnline,
+    loadAllData,
+    syncData,
+  } = useData();
   const [lastSync, setLastSync] = useState<Date | undefined>();
 
   useEffect(() => {
@@ -35,7 +42,7 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient
-      colors={[theme.colors.primary, theme.colors.card]}
+      colors={["#1e3c72", "#2a5298", "#4a90e2"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -51,14 +58,14 @@ export default function HomeScreen() {
                   marginBottom: 10,
                   borderRadius: 55,
                   borderWidth: 3,
-                  borderColor: theme.colors.primary,
+                  borderColor: "#4a90e2",
                   backgroundColor: "#fff",
                   justifyContent: "center",
                   alignItems: "center",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 10, height: 10 }, // sombra para direita
-                  shadowOpacity: 0.8,
-                  shadowRadius: 20,
+                  shadowColor: "#1e3c72",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.4,
+                  shadowRadius: 12,
                   elevation: 16,
                 }}
               >
@@ -77,12 +84,12 @@ export default function HomeScreen() {
                 style={{
                   fontSize: 28,
                   fontWeight: "bold",
-                  color: theme.colors.primary,
+                  color: "#fff",
                   letterSpacing: 2,
                   textAlign: "center",
-                  textShadowColor: theme.colors.card,
-                  textShadowOffset: { width: 1, height: 2 },
-                  textShadowRadius: 4,
+                  textShadowColor: "#1e3c72",
+                  textShadowOffset: { width: 2, height: 3 },
+                  textShadowRadius: 6,
                   transform: [{ scale: 1.04 }],
                   paddingHorizontal: 0,
                   paddingVertical: 0,
@@ -99,32 +106,30 @@ export default function HomeScreen() {
         >
           <View style={styles.infoRow}>
             <View style={styles.infoBox}>
-              <Ionicons
-                name="people-outline"
-                size={20}
-                color={theme.colors.white}
-              />
+              <Ionicons name="people-outline" size={18} color="#fff" />
               <Text style={styles.infoText}>
-                {isLoading ? "..." : players.length} jogadores
+                {isLoading ? "..." : players.length}
               </Text>
+              <Text style={styles.infoLabel}>Players</Text>
             </View>
             <View style={styles.infoBox}>
-              <Ionicons
-                name="shirt-outline"
-                size={20}
-                color={theme.colors.white}
-              />
+              <Ionicons name="shirt-outline" size={18} color="#fff" />
               <Text style={styles.infoText}>
-                {isLoading ? "..." : teams.length} times
+                {isLoading ? "..." : teams.length}
               </Text>
+              <Text style={styles.infoLabel}>Times</Text>
             </View>
             <View style={styles.infoBox}>
-              <Ionicons
-                name="cloud-outline"
-                size={20}
-                color={theme.colors.white}
-              />
-              <Text style={styles.infoText}>{user ? "Online" : "Offline"}</Text>
+              <Ionicons name="trophy-outline" size={18} color="#fff" />
+              <Text style={styles.infoText}>
+                {isLoading ? "..." : gameResults.length}
+              </Text>
+              <Text style={styles.infoLabel}>Jogos</Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Ionicons name="cloud-outline" size={18} color="#fff" />
+              <Text style={styles.infoText}>{user ? "On" : "Off"}</Text>
+              <Text style={styles.infoLabel}>Status</Text>
             </View>
           </View>
 
@@ -143,7 +148,7 @@ export default function HomeScreen() {
             <Ionicons
               name="people-outline"
               size={24}
-              color={theme.colors.primary}
+              color="#1e3c72"
               style={{ marginRight: 12 }}
             />
             <Text style={styles.menuButtonText}>Cadastrar Jogadores</Text>
@@ -155,7 +160,7 @@ export default function HomeScreen() {
             <Ionicons
               name="shirt-outline"
               size={24}
-              color={theme.colors.primary}
+              color="#1e3c72"
               style={{ marginRight: 12 }}
             />
             <Text style={styles.menuButtonText}>Cadastrar Times</Text>
@@ -167,7 +172,7 @@ export default function HomeScreen() {
             <Ionicons
               name="shuffle-outline"
               size={24}
-              color={theme.colors.primary}
+              color="#1e3c72"
               style={{ marginRight: 12 }}
             />
             <Text style={styles.menuButtonText}>Distribuir Jogadores</Text>
@@ -179,7 +184,7 @@ export default function HomeScreen() {
             <Ionicons
               name="calendar-outline"
               size={24}
-              color={theme.colors.primary}
+              color="#1e3c72"
               style={{ marginRight: 12 }}
             />
             <Text style={styles.menuButtonText}>Ver Jogos</Text>
@@ -191,35 +196,12 @@ export default function HomeScreen() {
             <Ionicons
               name="stats-chart-outline"
               size={24}
-              color={theme.colors.primary}
+              color="#1e3c72"
               style={{ marginRight: 12 }}
             />
             <Text style={styles.menuButtonText}>Histórico & Relatórios</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Card de Créditos */}
-        <LinearGradient
-          colors={["rgba(255, 255, 255, 0.95)", "rgba(240, 248, 255, 0.9)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.creditsCard}
-        >
-          <View style={styles.iconContainer}>
-            <Ionicons
-              name="code-outline"
-              size={22}
-              color={theme.colors.primary}
-            />
-          </View>
-          <View style={styles.creditsTextContainer}>
-            <Text style={styles.creditsText}>App created by</Text>
-            <Text style={styles.developerName}>DennisEmannuel</Text>
-          </View>
-          <View style={styles.devBadge}>
-            <Text style={styles.devText}>&lt;DEV&gt;</Text>
-          </View>
-        </LinearGradient>
       </View>
     </LinearGradient>
   );
@@ -237,23 +219,51 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 16,
+    justifyContent: "space-evenly",
+    alignItems: "center",
+    width: "100%",
     marginTop: 16,
+    paddingHorizontal: 8,
   },
   infoBox: {
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 8,
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 10,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    minWidth: 70,
+    flex: 1,
+    marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    shadowColor: "#1e3c72",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   infoText: {
-    marginLeft: 8,
-    color: theme.colors.white,
-    fontWeight: "600",
-    fontSize: 15,
+    marginTop: 4,
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+    textAlign: "center",
+    textShadowColor: "#1e3c72",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  infoLabel: {
+    marginTop: 2,
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 9,
+    textAlign: "center",
+    textShadowColor: "#1e3c72",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    opacity: 0.9,
   },
   menuContainer: {
     width: "100%",
@@ -262,88 +272,26 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     flexDirection: "row",
-    backgroundColor: theme.colors.background,
-    paddingVertical: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    paddingVertical: 18,
     paddingHorizontal: 24,
-    borderRadius: 12,
-    marginBottom: 20,
+    borderRadius: 16,
+    marginBottom: 16,
     width: "90%",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  menuButtonText: {
-    color: theme.colors.primary,
-    fontWeight: "700",
-    fontSize: 16,
-    letterSpacing: 0.5,
-  },
-  creditsCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    marginTop: 24,
     elevation: 8,
-    shadowColor: theme.colors.primary,
+    shadowColor: "#1e3c72",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(33, 150, 243, 0.2)",
-    transform: [{ scale: 1 }],
+    borderColor: "rgba(74, 144, 226, 0.3)",
   },
-  iconContainer: {
-    backgroundColor: "rgba(33, 150, 243, 0.1)",
-    padding: 8,
-    borderRadius: 12,
-    marginRight: 12,
-    elevation: 2,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  creditsTextContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  creditsText: {
-    color: "rgba(0, 0, 0, 0.6)",
-    fontSize: 12,
-    fontWeight: "400",
-    marginBottom: 2,
-  },
-  developerName: {
-    color: theme.colors.primary,
-    fontSize: 16,
+  menuButtonText: {
+    color: "#1e3c72",
     fontWeight: "700",
+    fontSize: 16,
     letterSpacing: 0.5,
-    textShadowColor: "rgba(33, 150, 243, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  devBadge: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    elevation: 4,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    transform: [{ rotate: "-2deg" }],
-  },
-  devText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
   },
 });

@@ -13,6 +13,8 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
+import { useData } from "../hooks/useData";
+import { GameResult } from "../services/dataService";
 
 function shuffle(array: any[]) {
   return array.sort(() => Math.random() - 0.5);
@@ -20,9 +22,12 @@ function shuffle(array: any[]) {
 
 export default function MatchScheduleScreen() {
   const isFocused = useIsFocused();
+
+  // Usar hook useData para sincronização com Firebase
+  const { teams, gameResults, saveGameResults, isLoading } = useData();
+
   const [quantidadeJogos, setQuantidadeJogos] = useState<string>("");
   const [autoSortear, setAutoSortear] = useState(true);
-  const [times, setTimes] = useState<{ name: string; color: string }[]>([]);
   const [jogos, setJogos] = useState<{ timeA: string; timeB: string }[]>([]);
   const [manualJogos, setManualJogos] = useState<
     { timeA: string; timeB: string }[]
@@ -32,23 +37,52 @@ export default function MatchScheduleScreen() {
   const [tipoCampeonato, setTipoCampeonato] = useState<
     "pontos" | "mata" | "grupos"
   >("pontos");
-  const [placaresJogos, setPlacaresJogos] = useState<Array<{ placarA: string; placarB: string; goleadoresA: string[]; goleadoresB: string[] }>>([]);
-  const [resultadosSalvos, setResultadosSalvos] = useState<Array<{ timeA: string; timeB: string; placarA: number; placarB: number; data: string; goleadoresA?: string[]; goleadoresB?: string[] }>>([]);
-  const [tabelaClassificacao, setTabelaClassificacao] = useState<
-    { time: string; pontos: number; jogos: number; vitorias: number; empates: number; derrotas: number; golsPro: number; golsContra: number; saldoGols: number }[]
+  const [placaresJogos, setPlacaresJogos] = useState<
+    Array<{
+      placarA: string;
+      placarB: string;
+      goleadoresA: string[];
+      goleadoresB: string[];
+    }>
   >([]);
-  const [jogadores, setJogadores] = useState<{ name: string; skill: number; position: string; yellowCards: number; redCards: number }[]>([]);
-  const [jogadoresPorTime, setJogadoresPorTime] = useState<{[key: string]: { name: string; skill: number; position: string; yellowCards: number; redCards: number }[]}>({});
+  const [tabelaClassificacao, setTabelaClassificacao] = useState<
+    {
+      time: string;
+      pontos: number;
+      jogos: number;
+      vitorias: number;
+      empates: number;
+      derrotas: number;
+      golsPro: number;
+      golsContra: number;
+      saldoGols: number;
+    }[]
+  >([]);
+  const [jogadores, setJogadores] = useState<
+    {
+      name: string;
+      skill: number;
+      position: string;
+      yellowCards: number;
+      redCards: number;
+    }[]
+  >([]);
+  const [jogadoresPorTime, setJogadoresPorTime] = useState<{
+    [key: string]: {
+      name: string;
+      skill: number;
+      position: string;
+      yellowCards: number;
+      redCards: number;
+    }[];
+  }>({});
 
   useEffect(() => {
     const fetchData = async () => {
-      const timesSalvos = await AsyncStorage.getItem("teams");
-      setTimes(timesSalvos ? JSON.parse(timesSalvos) : []);
+      // Os times agora vêm do hook useData automaticamente
       const jogosSalvos = await AsyncStorage.getItem("jogos_sorteados");
       setJogos(jogosSalvos ? JSON.parse(jogosSalvos) : []);
-      const resultadosSalvosStorage = await AsyncStorage.getItem("resultados_jogos");
-      const resultados = resultadosSalvosStorage ? JSON.parse(resultadosSalvosStorage) : [];
-      setResultadosSalvos(resultados);
+
       const placaresStorage = await AsyncStorage.getItem("placares_jogos");
       const placares = placaresStorage ? JSON.parse(placaresStorage) : [];
       // Garantir compatibilidade com formato antigo
@@ -56,32 +90,32 @@ export default function MatchScheduleScreen() {
         placarA: placar.placarA || "",
         placarB: placar.placarB || "",
         goleadoresA: placar.goleadoresA || [],
-        goleadoresB: placar.goleadoresB || []
+        goleadoresB: placar.goleadoresB || [],
       }));
       setPlacaresJogos(placaresComGoleadores);
-      
+
       // Carregar jogadores
       const jogadoresSalvos = await AsyncStorage.getItem("players");
       setJogadores(jogadoresSalvos ? JSON.parse(jogadoresSalvos) : []);
-      
+
       // Calcular tabela de classificação se houver resultados
-      if (resultados.length > 0) {
-        calcularTabelaClassificacao(resultados);
+      if (gameResults.length > 0) {
+        calcularTabelaClassificacao(gameResults);
       }
     };
     if (isFocused) fetchData();
-  }, [isFocused]);
+  }, [isFocused, gameResults]);
 
   // Recalcular tabela quando times ou tipo de campeonato mudarem
   useEffect(() => {
-    if (resultadosSalvos.length > 0 && times.length > 0) {
-      calcularTabelaClassificacao(resultadosSalvos);
+    if (gameResults.length > 0 && teams.length > 0) {
+      calcularTabelaClassificacao(gameResults);
     }
-  }, [times, tipoCampeonato, resultadosSalvos]);
+  }, [teams, tipoCampeonato, gameResults]);
 
   const sortearJogos = () => {
     let jogosGerados: { timeA: string; timeB: string }[] = [];
-    const embaralhados = shuffle([...times]);
+    const embaralhados = shuffle([...teams]);
     const qtd = parseInt(quantidadeJogos);
     if (!isNaN(qtd) && qtd > 0) {
       // Sorteio baseado na quantidade definida
@@ -119,7 +153,12 @@ export default function MatchScheduleScreen() {
       } else if (tipoCampeonato === "grupos") {
         const grupoA = embaralhados.filter((_, idx) => idx % 2 === 0);
         const grupoB = embaralhados.filter((_, idx) => idx % 2 !== 0);
-        if (grupoA && Array.isArray(grupoA) && grupoB && Array.isArray(grupoB)) {
+        if (
+          grupoA &&
+          Array.isArray(grupoA) &&
+          grupoB &&
+          Array.isArray(grupoB)
+        ) {
           grupoA.forEach((a) =>
             grupoB.forEach((b) =>
               jogosGerados.push({ timeA: a.name, timeB: b.name })
@@ -163,7 +202,10 @@ export default function MatchScheduleScreen() {
         ...manualJogos,
         { timeA: timeSelecionadoA, timeB: timeSelecionadoB },
       ]);
-      setPlacaresJogos([...placaresJogos, { placarA: "", placarB: "", goleadoresA: [], goleadoresB: [] }]);
+      setPlacaresJogos([
+        ...placaresJogos,
+        { placarA: "", placarB: "", goleadoresA: [], goleadoresB: [] },
+      ]);
       setTimeSelecionadoA("");
       setTimeSelecionadoB("");
     }
@@ -172,7 +214,10 @@ export default function MatchScheduleScreen() {
   // Função para salvar placares no AsyncStorage
   const salvarPlacares = async () => {
     try {
-      await AsyncStorage.setItem("placares_jogos", JSON.stringify(placaresJogos));
+      await AsyncStorage.setItem(
+        "placares_jogos",
+        JSON.stringify(placaresJogos)
+      );
       alert("Placares salvos com sucesso!");
     } catch (e) {
       alert("Erro ao salvar placares");
@@ -182,8 +227,8 @@ export default function MatchScheduleScreen() {
   // Função para finalizar jogos e salvar resultados
   const finalizarJogos = async () => {
     const jogosAtivos = autoSortear ? jogos : manualJogos;
-    const novosResultados: { timeA: string; timeB: string; placarA: number; placarB: number; data: string; goleadoresA?: string[]; goleadoresB?: string[] }[] = [];
-    
+    const novosResultados: GameResult[] = [];
+
     if (jogosAtivos && Array.isArray(jogosAtivos)) {
       jogosAtivos.forEach((jogo, index) => {
         const placar = placaresJogos[index];
@@ -193,19 +238,19 @@ export default function MatchScheduleScreen() {
             timeB: jogo.timeB,
             placarA: parseInt(placar.placarA) || 0,
             placarB: parseInt(placar.placarB) || 0,
-            data: new Date().toLocaleDateString('pt-BR'),
+            data: new Date().toLocaleDateString("pt-BR"),
             goleadoresA: placar.goleadoresA || [],
-            goleadoresB: placar.goleadoresB || []
+            goleadoresB: placar.goleadoresB || [],
           });
         }
       });
     }
 
-    const todosResultados = [...resultadosSalvos, ...novosResultados];
-    
+    const todosResultados = [...gameResults, ...novosResultados];
+
     try {
-      await AsyncStorage.setItem("resultados_jogos", JSON.stringify(todosResultados));
-      setResultadosSalvos(todosResultados);
+      // Usar o hook useData para sincronizar com Firebase
+      await saveGameResults(todosResultados);
       calcularTabelaClassificacao(todosResultados);
       alert("Resultados finalizados e salvos!");
     } catch (e) {
@@ -214,72 +259,88 @@ export default function MatchScheduleScreen() {
   };
 
   // Função para calcular pontuação por tipo de campeonato
-  const calcularTabelaClassificacao = (resultados: { timeA: string; timeB: string; placarA: number; placarB: number; data: string; goleadoresA?: string[]; goleadoresB?: string[] }[]) => {
-    const tabela: { [key: string]: { time: string; pontos: number; jogos: number; vitorias: number; empates: number; derrotas: number; golsPro: number; golsContra: number; saldoGols: number } } = {};
+  const calcularTabelaClassificacao = (resultados: GameResult[]) => {
+    const tabela: {
+      [key: string]: {
+        time: string;
+        pontos: number;
+        jogos: number;
+        vitorias: number;
+        empates: number;
+        derrotas: number;
+        golsPro: number;
+        golsContra: number;
+        saldoGols: number;
+      };
+    } = {};
 
     // Inicializar todos os times na tabela
-    if (times && Array.isArray(times)) {
-      times.forEach(time => {
-      tabela[time.name] = {
-        time: time.name,
-        pontos: 0,
-        jogos: 0,
-        vitorias: 0,
-        empates: 0,
-        derrotas: 0,
-        golsPro: 0,
-        golsContra: 0,
-        saldoGols: 0
-      };
-    });
+    if (teams && Array.isArray(teams)) {
+      teams.forEach((team) => {
+        tabela[team.name] = {
+          time: team.name,
+          pontos: 0,
+          jogos: 0,
+          vitorias: 0,
+          empates: 0,
+          derrotas: 0,
+          golsPro: 0,
+          golsContra: 0,
+          saldoGols: 0,
+        };
+      });
     }
 
     // Processar resultados
     if (resultados && Array.isArray(resultados)) {
-      resultados.forEach(resultado => {
-      if (tabela[resultado.timeA] && tabela[resultado.timeB]) {
-        // Time A
-        tabela[resultado.timeA].jogos++;
-        tabela[resultado.timeA].golsPro += resultado.placarA;
-        tabela[resultado.timeA].golsContra += resultado.placarB;
-        tabela[resultado.timeA].saldoGols = tabela[resultado.timeA].golsPro - tabela[resultado.timeA].golsContra;
+      resultados.forEach((resultado) => {
+        if (tabela[resultado.timeA] && tabela[resultado.timeB]) {
+          // Time A
+          tabela[resultado.timeA].jogos++;
+          tabela[resultado.timeA].golsPro += resultado.placarA;
+          tabela[resultado.timeA].golsContra += resultado.placarB;
+          tabela[resultado.timeA].saldoGols =
+            tabela[resultado.timeA].golsPro -
+            tabela[resultado.timeA].golsContra;
 
-        // Time B
-        tabela[resultado.timeB].jogos++;
-        tabela[resultado.timeB].golsPro += resultado.placarB;
-        tabela[resultado.timeB].golsContra += resultado.placarA;
-        tabela[resultado.timeB].saldoGols = tabela[resultado.timeB].golsPro - tabela[resultado.timeB].golsContra;
+          // Time B
+          tabela[resultado.timeB].jogos++;
+          tabela[resultado.timeB].golsPro += resultado.placarB;
+          tabela[resultado.timeB].golsContra += resultado.placarA;
+          tabela[resultado.timeB].saldoGols =
+            tabela[resultado.timeB].golsPro -
+            tabela[resultado.timeB].golsContra;
 
-        // Determinar resultado e pontos
-        if (resultado.placarA > resultado.placarB) {
-          // Time A venceu
-          tabela[resultado.timeA].vitorias++;
-          tabela[resultado.timeB].derrotas++;
-          if (tipoCampeonato === "pontos") {
-            tabela[resultado.timeA].pontos += 3;
+          // Determinar resultado e pontos
+          if (resultado.placarA > resultado.placarB) {
+            // Time A venceu
+            tabela[resultado.timeA].vitorias++;
+            tabela[resultado.timeB].derrotas++;
+            if (tipoCampeonato === "pontos") {
+              tabela[resultado.timeA].pontos += 3;
+            } else {
+              tabela[resultado.timeA].pontos += 1;
+            }
+          } else if (resultado.placarB > resultado.placarA) {
+            // Time B venceu
+            tabela[resultado.timeB].vitorias++;
+            tabela[resultado.timeA].derrotas++;
+            if (tipoCampeonato === "pontos") {
+              tabela[resultado.timeB].pontos += 3;
+            } else {
+              tabela[resultado.timeB].pontos += 1;
+            }
           } else {
-            tabela[resultado.timeA].pontos += 1;
-          }
-        } else if (resultado.placarB > resultado.placarA) {
-          // Time B venceu
-          tabela[resultado.timeB].vitorias++;
-          tabela[resultado.timeA].derrotas++;
-          if (tipoCampeonato === "pontos") {
-            tabela[resultado.timeB].pontos += 3;
-          } else {
-            tabela[resultado.timeB].pontos += 1;
-          }
-        } else {
-          // Empate
-          tabela[resultado.timeA].empates++;
-          tabela[resultado.timeB].empates++;
-          if (tipoCampeonato === "pontos") {
-            tabela[resultado.timeA].pontos += 1;
-            tabela[resultado.timeB].pontos += 1;
+            // Empate
+            tabela[resultado.timeA].empates++;
+            tabela[resultado.timeB].empates++;
+            if (tipoCampeonato === "pontos") {
+              tabela[resultado.timeA].pontos += 1;
+              tabela[resultado.timeB].pontos += 1;
+            }
           }
         }
-      }
-    });
+      });
     }
 
     // Converter para array e ordenar
@@ -295,8 +356,8 @@ export default function MatchScheduleScreen() {
   // Função para limpar histórico
   const limparHistorico = async () => {
     try {
-      await AsyncStorage.removeItem("resultados_jogos");
-      setResultadosSalvos([]);
+      // Usar o hook para limpar dados do Firebase também
+      await saveGameResults([]);
       setTabelaClassificacao([]);
       alert("Histórico limpo com sucesso!");
     } catch (e) {
@@ -305,33 +366,41 @@ export default function MatchScheduleScreen() {
   };
 
   // Função para adicionar goleador
-  const adicionarGoleador = (jogoIndex: number, time: 'A' | 'B', jogador: string) => {
+  const adicionarGoleador = (
+    jogoIndex: number,
+    time: "A" | "B",
+    jogador: string
+  ) => {
     if (jogoIndex < 0 || jogoIndex >= placaresJogos.length) return;
-    
+
     const novos = [...placaresJogos];
-    const campo = time === 'A' ? 'goleadoresA' : 'goleadoresB';
+    const campo = time === "A" ? "goleadoresA" : "goleadoresB";
     const goleadoresAtuais = novos[jogoIndex][campo] || [];
-    
+
     if (!goleadoresAtuais.includes(jogador)) {
       novos[jogoIndex] = {
         ...novos[jogoIndex],
-        [campo]: [...goleadoresAtuais, jogador]
+        [campo]: [...goleadoresAtuais, jogador],
       };
       setPlacaresJogos(novos);
     }
   };
 
   // Função para remover goleador
-  const removerGoleador = (jogoIndex: number, time: 'A' | 'B', jogador: string) => {
+  const removerGoleador = (
+    jogoIndex: number,
+    time: "A" | "B",
+    jogador: string
+  ) => {
     if (jogoIndex < 0 || jogoIndex >= placaresJogos.length) return;
-    
+
     const novos = [...placaresJogos];
-    const campo = time === 'A' ? 'goleadoresA' : 'goleadoresB';
+    const campo = time === "A" ? "goleadoresA" : "goleadoresB";
     const goleadoresAtuais = novos[jogoIndex][campo] || [];
-    
+
     novos[jogoIndex] = {
       ...novos[jogoIndex],
-      [campo]: goleadoresAtuais.filter(g => g !== jogador)
+      [campo]: goleadoresAtuais.filter((g) => g !== jogador),
     };
     setPlacaresJogos(novos);
   };
@@ -339,18 +408,20 @@ export default function MatchScheduleScreen() {
   // Função para carregar jogadores de todos os times
   const carregarJogadoresPorTime = async () => {
     try {
-      const distribuicoesSalvas = await AsyncStorage.getItem("savedDistributions");
+      const distribuicoesSalvas = await AsyncStorage.getItem(
+        "savedDistributions"
+      );
       if (!distribuicoesSalvas) {
         setJogadoresPorTime({});
         return;
       }
-      
+
       const distribuicoes = JSON.parse(distribuicoesSalvas);
       if (!Array.isArray(distribuicoes) || distribuicoes.length === 0) {
         setJogadoresPorTime({});
         return;
       }
-      
+
       // Pegar a distribuição mais recente (última do array)
       const ultimaDistribuicao = distribuicoes[distribuicoes.length - 1];
       if (ultimaDistribuicao?.distribution) {
@@ -359,7 +430,7 @@ export default function MatchScheduleScreen() {
         setJogadoresPorTime({});
       }
     } catch (error) {
-      console.error('Erro ao buscar jogadores dos times:', error);
+      console.error("Erro ao buscar jogadores dos times:", error);
       setJogadoresPorTime({});
     }
   };
@@ -446,7 +517,12 @@ export default function MatchScheduleScreen() {
                   ]}
                   onPress={salvarJogosSorteados}
                 >
-                  <Text style={[styles.sortBtnText, { color: theme.colors.secondary }]}>
+                  <Text
+                    style={[
+                      styles.sortBtnText,
+                      { color: theme.colors.secondary },
+                    ]}
+                  >
                     Salvar jogos sorteados
                   </Text>
                 </TouchableOpacity>
@@ -457,7 +533,9 @@ export default function MatchScheduleScreen() {
                   ]}
                   onPress={removerJogosSalvos}
                 >
-                  <Text style={[styles.sortBtnText, { color: theme.colors.text }]}>
+                  <Text
+                    style={[styles.sortBtnText, { color: theme.colors.text }]}
+                  >
                     Remover jogos salvos
                   </Text>
                 </TouchableOpacity>
@@ -468,18 +546,28 @@ export default function MatchScheduleScreen() {
                   ]}
                   onPress={salvarPlacares}
                 >
-                  <Text style={[styles.sortBtnText, { color: theme.colors.primary }]}>
+                  <Text
+                    style={[
+                      styles.sortBtnText,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
                     💾 Salvar Placares
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
                     styles.sortBtn,
-                    { backgroundColor: theme.colors.success || "#28a745", marginTop: 8 },
+                    {
+                      backgroundColor: theme.colors.success || "#28a745",
+                      marginTop: 8,
+                    },
                   ]}
                   onPress={finalizarJogos}
                 >
-                  <Text style={[styles.sortBtnText, { color: theme.colors.white }]}>
+                  <Text
+                    style={[styles.sortBtnText, { color: theme.colors.white }]}
+                  >
                     🏆 Finalizar Jogos
                   </Text>
                 </TouchableOpacity>
@@ -493,7 +581,7 @@ export default function MatchScheduleScreen() {
                   <Text style={styles.manualLabel}>Time A:</Text>
                   <FlatList
                     horizontal
-                    data={times}
+                    data={teams}
                     keyExtractor={(item) => item.name}
                     renderItem={({ item }) => (
                       <TouchableOpacity
@@ -521,7 +609,7 @@ export default function MatchScheduleScreen() {
                   <Text style={styles.manualLabel}>Time B:</Text>
                   <FlatList
                     horizontal
-                    data={times}
+                    data={teams}
                     keyExtractor={(item) => item.name}
                     renderItem={({ item }) => (
                       <TouchableOpacity
@@ -557,7 +645,9 @@ export default function MatchScheduleScreen() {
               <Text style={styles.sectionTitle}>Jogos:</Text>
               <FlatList
                 data={autoSortear ? jogos : manualJogos}
-                keyExtractor={(_, idx) => idx.toString()}
+                keyExtractor={(item, idx) =>
+                  `match-${idx}-${item.timeA}-${item.timeB}`
+                }
                 contentContainerStyle={{ paddingBottom: 24 }}
                 renderItem={({ item, index }) => (
                   <View style={styles.matchCard}>
@@ -579,7 +669,12 @@ export default function MatchScheduleScreen() {
                         onChangeText={(txt) => {
                           const novos = [...placaresJogos];
                           if (!novos[index]) {
-                            novos[index] = { placarA: "", placarB: "", goleadoresA: [], goleadoresB: [] };
+                            novos[index] = {
+                              placarA: "",
+                              placarB: "",
+                              goleadoresA: [],
+                              goleadoresB: [],
+                            };
                           }
                           novos[index] = { ...novos[index], placarA: txt };
                           setPlacaresJogos(novos);
@@ -603,7 +698,12 @@ export default function MatchScheduleScreen() {
                         onChangeText={(txt) => {
                           const novos = [...placaresJogos];
                           if (!novos[index]) {
-                            novos[index] = { placarA: "", placarB: "", goleadoresA: [], goleadoresB: [] };
+                            novos[index] = {
+                              placarA: "",
+                              placarB: "",
+                              goleadoresA: [],
+                              goleadoresB: [],
+                            };
                           }
                           novos[index] = { ...novos[index], placarB: txt };
                           setPlacaresJogos(novos);
@@ -612,83 +712,117 @@ export default function MatchScheduleScreen() {
                         placeholderTextColor="#185a9d"
                       />
                     </View>
-                    
+
                     {/* Seleção de Goleadores */}
                     <View style={styles.goalScorersSection}>
-                      <Text style={styles.goalScorersTitle}>⚽ Goleadores:</Text>
-                      
+                      <Text style={styles.goalScorersTitle}>
+                        ⚽ Goleadores:
+                      </Text>
+
                       {/* Goleadores Time A */}
                       <View style={styles.teamGoalScorers}>
-                        <Text style={styles.teamGoalScorersTitle}>{item.timeA}:</Text>
+                        <Text style={styles.teamGoalScorersTitle}>
+                          {item.timeA}:
+                        </Text>
                         <View style={styles.goalScorersRow}>
-                          {(jogadoresPorTime[item.timeA] ?? []).map((jogador) => {
-                            const isSelected = placaresJogos[index]?.goleadoresA?.includes(jogador.name) || false;
-                            return (
-                              <TouchableOpacity
-                                key={jogador.name}
-                                style={[
-                                  styles.goalScorerBtn,
-                                  isSelected && styles.goalScorerBtnActive
-                                ]}
-                                onPress={() => {
-                                  if (isSelected) {
-                                    removerGoleador(index, 'A', jogador.name);
-                                  } else {
-                                    adicionarGoleador(index, 'A', jogador.name);
-                                  }
-                                }}
-                              >
-                                <Text style={[
-                                  styles.goalScorerBtnText,
-                                  isSelected && styles.goalScorerBtnTextActive
-                                ]}>
-                                  {jogador.name}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                          {(jogadoresPorTime[item.timeA] ?? []).map(
+                            (jogador, jogadorIndex) => {
+                              const isSelected =
+                                placaresJogos[index]?.goleadoresA?.includes(
+                                  jogador.name
+                                ) || false;
+                              return (
+                                <TouchableOpacity
+                                  key={`scorer-A-${index}-${jogadorIndex}-${jogador.name}`}
+                                  style={[
+                                    styles.goalScorerBtn,
+                                    isSelected && styles.goalScorerBtnActive,
+                                  ]}
+                                  onPress={() => {
+                                    if (isSelected) {
+                                      removerGoleador(index, "A", jogador.name);
+                                    } else {
+                                      adicionarGoleador(
+                                        index,
+                                        "A",
+                                        jogador.name
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.goalScorerBtnText,
+                                      isSelected &&
+                                        styles.goalScorerBtnTextActive,
+                                    ]}
+                                  >
+                                    {jogador.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            }
+                          )}
                         </View>
-                        {(placaresJogos[index]?.goleadoresA?.length ?? 0) > 0 && (
+                        {(placaresJogos[index]?.goleadoresA?.length ?? 0) >
+                          0 && (
                           <Text style={styles.selectedGoalScorers}>
-                            Selecionados: {placaresJogos[index].goleadoresA.join(", ")}
+                            Selecionados:{" "}
+                            {placaresJogos[index].goleadoresA.join(", ")}
                           </Text>
                         )}
                       </View>
-                      
+
                       {/* Goleadores Time B */}
                       <View style={styles.teamGoalScorers}>
-                        <Text style={styles.teamGoalScorersTitle}>{item.timeB}:</Text>
+                        <Text style={styles.teamGoalScorersTitle}>
+                          {item.timeB}:
+                        </Text>
                         <View style={styles.goalScorersRow}>
-                          {(jogadoresPorTime[item.timeB] ?? []).map((jogador) => {
-                            const isSelected = placaresJogos[index]?.goleadoresB?.includes(jogador.name) || false;
-                            return (
-                              <TouchableOpacity
-                                key={jogador.name}
-                                style={[
-                                  styles.goalScorerBtn,
-                                  isSelected && styles.goalScorerBtnActive
-                                ]}
-                                onPress={() => {
-                                  if (isSelected) {
-                                    removerGoleador(index, 'B', jogador.name);
-                                  } else {
-                                    adicionarGoleador(index, 'B', jogador.name);
-                                  }
-                                }}
-                              >
-                                <Text style={[
-                                  styles.goalScorerBtnText,
-                                  isSelected && styles.goalScorerBtnTextActive
-                                ]}>
-                                  {jogador.name}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                          {(jogadoresPorTime[item.timeB] ?? []).map(
+                            (jogador, jogadorIndex) => {
+                              const isSelected =
+                                placaresJogos[index]?.goleadoresB?.includes(
+                                  jogador.name
+                                ) || false;
+                              return (
+                                <TouchableOpacity
+                                  key={`scorer-B-${index}-${jogadorIndex}-${jogador.name}`}
+                                  style={[
+                                    styles.goalScorerBtn,
+                                    isSelected && styles.goalScorerBtnActive,
+                                  ]}
+                                  onPress={() => {
+                                    if (isSelected) {
+                                      removerGoleador(index, "B", jogador.name);
+                                    } else {
+                                      adicionarGoleador(
+                                        index,
+                                        "B",
+                                        jogador.name
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.goalScorerBtnText,
+                                      isSelected &&
+                                        styles.goalScorerBtnTextActive,
+                                    ]}
+                                  >
+                                    {jogador.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            }
+                          )}
                         </View>
-                        {(placaresJogos[index]?.goleadoresB?.length ?? 0) > 0 && (
+                        {(placaresJogos[index]?.goleadoresB?.length ?? 0) >
+                          0 && (
                           <Text style={styles.selectedGoalScorers}>
-                            Selecionados: {placaresJogos[index].goleadoresB.join(", ")}
+                            Selecionados:{" "}
+                            {placaresJogos[index].goleadoresB.join(", ")}
                           </Text>
                         )}
                       </View>
@@ -700,13 +834,17 @@ export default function MatchScheduleScreen() {
                 }
               />
             </View>
-            
+
             {/* Tabela de Classificação */}
             {tabelaClassificacao.length > 0 && (
               <View style={styles.sectionCard}>
-                <Text style={styles.sectionTitle}>🏆 Tabela de Classificação:</Text>
+                <Text style={styles.sectionTitle}>
+                  🏆 Tabela de Classificação:
+                </Text>
                 <View style={styles.tableHeader}>
-                  <Text style={[styles.tableHeaderText, { flex: 2 }]}>Time</Text>
+                  <Text style={[styles.tableHeaderText, { flex: 2 }]}>
+                    Time
+                  </Text>
                   <Text style={styles.tableHeaderText}>Pts</Text>
                   <Text style={styles.tableHeaderText}>J</Text>
                   <Text style={styles.tableHeaderText}>V</Text>
@@ -715,24 +853,54 @@ export default function MatchScheduleScreen() {
                   <Text style={styles.tableHeaderText}>SG</Text>
                 </View>
                 {tabelaClassificacao.map((item, index) => (
-                  <View key={item.time} style={[styles.tableRow, index % 2 === 0 && styles.tableRowEven]}>
-                    <Text style={[styles.tableCell, { flex: 2, fontWeight: 'bold' }]}>{item.time}</Text>
-                    <Text style={[styles.tableCell, { fontWeight: 'bold', color: theme.colors.primary }]}>{item.pontos}</Text>
+                  <View
+                    key={item.time}
+                    style={[
+                      styles.tableRow,
+                      index % 2 === 0 && styles.tableRowEven,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { flex: 2, fontWeight: "bold" },
+                      ]}
+                    >
+                      {item.time}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { fontWeight: "bold", color: theme.colors.primary },
+                      ]}
+                    >
+                      {item.pontos}
+                    </Text>
                     <Text style={styles.tableCell}>{item.jogos}</Text>
                     <Text style={styles.tableCell}>{item.vitorias}</Text>
                     <Text style={styles.tableCell}>{item.empates}</Text>
                     <Text style={styles.tableCell}>{item.derrotas}</Text>
-                    <Text style={[styles.tableCell, { color: item.saldoGols >= 0 ? '#28a745' : '#dc3545' }]}>{item.saldoGols > 0 ? '+' : ''}{item.saldoGols}</Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { color: item.saldoGols >= 0 ? "#28a745" : "#dc3545" },
+                      ]}
+                    >
+                      {item.saldoGols > 0 ? "+" : ""}
+                      {item.saldoGols}
+                    </Text>
                   </View>
                 ))}
               </View>
             )}
-            
+
             {/* Histórico de Resultados */}
-            {resultadosSalvos.length > 0 && (
+            {gameResults.length > 0 && (
               <View style={styles.sectionCard}>
                 <View style={styles.historyHeader}>
-                  <Text style={styles.sectionTitle}>📊 Histórico de Resultados:</Text>
+                  <Text style={styles.sectionTitle}>
+                    📊 Histórico de Resultados:
+                  </Text>
                   <TouchableOpacity
                     style={styles.clearHistoryBtn}
                     onPress={limparHistorico}
@@ -740,33 +908,49 @@ export default function MatchScheduleScreen() {
                     <Text style={styles.clearHistoryBtnText}>🗑️ Limpar</Text>
                   </TouchableOpacity>
                 </View>
-                {resultadosSalvos.slice(-10).reverse().map((resultado, index) => (
-                  <View key={index} style={styles.historyItem}>
-                    <Text style={styles.historyDate}>{resultado.data}</Text>
-                    <View style={styles.historyMatch}>
-                      <Text style={styles.historyTeam}>{resultado.timeA}</Text>
-                      <Text style={styles.historyScore}>{resultado.placarA} - {resultado.placarB}</Text>
-                      <Text style={styles.historyTeam}>{resultado.timeB}</Text>
-                    </View>
-                    {/* Mostrar goleadores se disponíveis */}
-                    {((resultado.goleadoresA?.length ?? 0) > 0 || (resultado.goleadoresB?.length ?? 0) > 0) && (
-                      <View style={styles.historyGoalScorers}>
-                        {(resultado.goleadoresA && resultado.goleadoresA.length > 0) && (
-                          <Text style={styles.historyGoalScorerText}>
-                            ⚽ {resultado.timeA}: {resultado.goleadoresA.join(", ")}
-                          </Text>
-                        )}
-                        {(resultado.goleadoresB && resultado.goleadoresB.length > 0) && (
-                          <Text style={styles.historyGoalScorerText}>
-                            ⚽ {resultado.timeB}: {resultado.goleadoresB.join(", ")}
-                          </Text>
-                        )}
+                {gameResults
+                  .slice(-10)
+                  .reverse()
+                  .map((resultado, index) => (
+                    <View key={index} style={styles.historyItem}>
+                      <Text style={styles.historyDate}>{resultado.data}</Text>
+                      <View style={styles.historyMatch}>
+                        <Text style={styles.historyTeam}>
+                          {resultado.timeA}
+                        </Text>
+                        <Text style={styles.historyScore}>
+                          {resultado.placarA} - {resultado.placarB}
+                        </Text>
+                        <Text style={styles.historyTeam}>
+                          {resultado.timeB}
+                        </Text>
                       </View>
-                    )}
-                  </View>
-                ))}
-                {resultadosSalvos.length > 10 && (
-                  <Text style={styles.moreResultsText}>... e mais {resultadosSalvos.length - 10} resultados</Text>
+                      {/* Mostrar goleadores se disponíveis */}
+                      {((resultado.goleadoresA?.length ?? 0) > 0 ||
+                        (resultado.goleadoresB?.length ?? 0) > 0) && (
+                        <View style={styles.historyGoalScorers}>
+                          {resultado.goleadoresA &&
+                            resultado.goleadoresA.length > 0 && (
+                              <Text style={styles.historyGoalScorerText}>
+                                ⚽ {resultado.timeA}:{" "}
+                                {resultado.goleadoresA.join(", ")}
+                              </Text>
+                            )}
+                          {resultado.goleadoresB &&
+                            resultado.goleadoresB.length > 0 && (
+                              <Text style={styles.historyGoalScorerText}>
+                                ⚽ {resultado.timeB}:{" "}
+                                {resultado.goleadoresB.join(", ")}
+                              </Text>
+                            )}
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                {gameResults.length > 10 && (
+                  <Text style={styles.moreResultsText}>
+                    ... e mais {gameResults.length - 10} resultados
+                  </Text>
                 )}
               </View>
             )}
@@ -783,11 +967,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     margin: theme.spacing.md,
-    ...theme.components.card
+    ...theme.components.card,
   },
   sectionCard: {
     marginBottom: theme.spacing.lg,
-    ...theme.components.card
+    ...theme.components.card,
   },
   sectionTitle: {
     ...theme.typography.h3,

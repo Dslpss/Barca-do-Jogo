@@ -13,6 +13,7 @@ import {
   Modal,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { generateUniqueId } from "../utils/keyGenerator";
 import { LinearGradient } from "expo-linear-gradient";
 import { theme } from "../theme/theme";
 import AppHeader from "../components/AppHeader";
@@ -46,7 +47,9 @@ export default function AssignPlayersScreen() {
   const [timesJogadores, setTimesJogadores] = useState<{
     [key: string]: Player[];
   }>({});
-  const [savedDistributions, setSavedDistributions] = useState<SavedDistribution[]>([]);
+  const [savedDistributions, setSavedDistributions] = useState<
+    SavedDistribution[]
+  >([]);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [distributionName, setDistributionName] = useState("");
@@ -55,10 +58,14 @@ export default function AssignPlayersScreen() {
     const fetchData = async () => {
       const jogadoresSalvos = await AsyncStorage.getItem("players");
       const timesSalvos = await AsyncStorage.getItem("teams");
-      const distribuicoesSalvas = await AsyncStorage.getItem("savedDistributions");
+      const distribuicoesSalvas = await AsyncStorage.getItem(
+        "savedDistributions"
+      );
       setJogadores(jogadoresSalvos ? JSON.parse(jogadoresSalvos) : []);
       setTimes(timesSalvos ? JSON.parse(timesSalvos) : []);
-      setSavedDistributions(distribuicoesSalvas ? JSON.parse(distribuicoesSalvas) : []);
+      setSavedDistributions(
+        distribuicoesSalvas ? JSON.parse(distribuicoesSalvas) : []
+      );
     };
     if (isFocused) fetchData();
   }, [isFocused]);
@@ -66,7 +73,10 @@ export default function AssignPlayersScreen() {
   // Função para calcular a média de habilidade de um time
   const calcularMediaHabilidade = (jogadoresTime: Player[]): number => {
     if (jogadoresTime.length === 0) return 0;
-    const somaHabilidades = jogadoresTime.reduce((soma, jogador) => soma + jogador.skill, 0);
+    const somaHabilidades = jogadoresTime.reduce(
+      (soma, jogador) => soma + jogador.skill,
+      0
+    );
     return somaHabilidades / jogadoresTime.length;
   };
 
@@ -87,7 +97,10 @@ export default function AssignPlayersScreen() {
   // Função para balancear times por habilidade e posição
   const balancearTimesPorHabilidade = () => {
     if (times.length < 2) {
-      Alert.alert("Erro", "É necessário ter pelo menos 2 times cadastrados para balancear.");
+      Alert.alert(
+        "Erro",
+        "É necessário ter pelo menos 2 times cadastrados para balancear."
+      );
       return sortearJogadoresAleatorio();
     }
 
@@ -96,26 +109,26 @@ export default function AssignPlayersScreen() {
     times.forEach((time) => {
       resultado[time.name] = [];
     });
-    
+
     // Agrupar jogadores por posição
     const jogadoresPorPosicao: { [key: string]: Player[] } = {};
-    jogadores.forEach(jogador => {
+    jogadores.forEach((jogador) => {
       if (!jogadoresPorPosicao[jogador.position]) {
         jogadoresPorPosicao[jogador.position] = [];
       }
       jogadoresPorPosicao[jogador.position].push(jogador);
     });
-    
+
     // Ordenar cada grupo de posição por habilidade (do mais habilidoso para o menos)
-    Object.keys(jogadoresPorPosicao).forEach(posicao => {
+    Object.keys(jogadoresPorPosicao).forEach((posicao) => {
       jogadoresPorPosicao[posicao].sort((a, b) => b.skill - a.skill);
     });
-    
+
     // Distribuir goleiros primeiro (se houver)
     if (jogadoresPorPosicao["Goleiro"]) {
       const goleiros = jogadoresPorPosicao["Goleiro"];
       delete jogadoresPorPosicao["Goleiro"];
-      
+
       // Distribuir um goleiro para cada time, começando pelos mais habilidosos
       goleiros.forEach((goleiro, index) => {
         if (index < times.length) {
@@ -127,50 +140,52 @@ export default function AssignPlayersScreen() {
         }
       });
     }
-    
+
     // Distribuir as demais posições usando o método "serpentina" (zigzag)
-    Object.keys(jogadoresPorPosicao).forEach(posicao => {
+    Object.keys(jogadoresPorPosicao).forEach((posicao) => {
       let direcao = 1; // 1 para frente, -1 para trás
       let timeAtual = 0;
-      
+
       // Calcular o time inicial com base na média de habilidade atual
       // Começar pelo time com menor média de habilidade
-      const mediasPorTime = times.map(time => ({
+      const mediasPorTime = times.map((time) => ({
         nome: time.name,
-        media: calcularMediaHabilidade(resultado[time.name])
+        media: calcularMediaHabilidade(resultado[time.name]),
       }));
-      
+
       mediasPorTime.sort((a, b) => a.media - b.media);
-      const timeInicial = times.findIndex(t => t.name === mediasPorTime[0].nome);
+      const timeInicial = times.findIndex(
+        (t) => t.name === mediasPorTime[0].nome
+      );
       timeAtual = timeInicial >= 0 ? timeInicial : 0;
-      
+
       jogadoresPorPosicao[posicao].forEach((jogador) => {
         // Adicionar jogador ao time atual
         resultado[times[timeAtual].name].push(jogador);
-        
+
         // Mover para o próximo time
         timeAtual += direcao;
-        
+
         // Mudar direção se chegou ao final ou início da lista de times
         if (timeAtual >= times.length - 1 || timeAtual <= 0) {
           direcao *= -1;
         }
       });
     });
-    
+
     return resultado;
   };
 
   // Função principal de sorteio que decide qual método usar
   const sortearJogadores = () => {
     let resultado;
-    
+
     if (balancearTimes) {
       resultado = balancearTimesPorHabilidade();
     } else {
       resultado = sortearJogadoresAleatorio();
     }
-    
+
     setTimesJogadores(resultado);
   };
 
@@ -182,22 +197,28 @@ export default function AssignPlayersScreen() {
     }
 
     if (Object.keys(timesJogadores).length === 0) {
-      Alert.alert("Erro", "Não há distribuição para salvar. Faça o sorteio primeiro.");
+      Alert.alert(
+        "Erro",
+        "Não há distribuição para salvar. Faça o sorteio primeiro."
+      );
       return;
     }
 
     const newDistribution: SavedDistribution = {
-      id: Date.now().toString(),
+      id: generateUniqueId(),
       name: distributionName.trim(),
-      date: new Date().toLocaleDateString('pt-BR'),
+      date: new Date().toLocaleDateString("pt-BR"),
       distribution: timesJogadores,
       teams: times,
     };
 
     const updatedDistributions = [...savedDistributions, newDistribution];
     setSavedDistributions(updatedDistributions);
-    await AsyncStorage.setItem("savedDistributions", JSON.stringify(updatedDistributions));
-    
+    await AsyncStorage.setItem(
+      "savedDistributions",
+      JSON.stringify(updatedDistributions)
+    );
+
     setDistributionName("");
     setShowSaveModal(false);
     Alert.alert("Sucesso", "Distribuição salva com sucesso!");
@@ -208,7 +229,10 @@ export default function AssignPlayersScreen() {
     setTimesJogadores(distribution.distribution);
     setTimes(distribution.teams);
     setShowLoadModal(false);
-    Alert.alert("Sucesso", `Distribuição "${distribution.name}" carregada com sucesso!`);
+    Alert.alert(
+      "Sucesso",
+      `Distribuição "${distribution.name}" carregada com sucesso!`
+    );
   };
 
   // Função para excluir distribuição salva
@@ -222,9 +246,14 @@ export default function AssignPlayersScreen() {
           text: "Excluir",
           style: "destructive",
           onPress: async () => {
-            const updatedDistributions = savedDistributions.filter(d => d.id !== id);
+            const updatedDistributions = savedDistributions.filter(
+              (d) => d.id !== id
+            );
             setSavedDistributions(updatedDistributions);
-            await AsyncStorage.setItem("savedDistributions", JSON.stringify(updatedDistributions));
+            await AsyncStorage.setItem(
+              "savedDistributions",
+              JSON.stringify(updatedDistributions)
+            );
           },
         },
       ]
@@ -238,58 +267,84 @@ export default function AssignPlayersScreen() {
         <View style={styles.container}>
           <View style={styles.switchRow}>
             <Text
-              style={{ color: theme.colors.primary, fontWeight: "bold", fontSize: 16 }}
+              style={{
+                color: theme.colors.primary,
+                fontWeight: "bold",
+                fontSize: 16,
+              }}
             >
               Sortear jogadores automaticamente
             </Text>
             <Switch value={autoSortear} onValueChange={setAutoSortear} />
           </View>
-          
+
           {autoSortear && (
             <View style={styles.switchRow}>
               <Text
-                style={{ color: theme.colors.primary, fontWeight: "bold", fontSize: 16 }}
+                style={{
+                  color: theme.colors.primary,
+                  fontWeight: "bold",
+                  fontSize: 16,
+                }}
               >
                 Balancear times por habilidade e posição
               </Text>
-              <Switch value={balancearTimes} onValueChange={setBalancearTimes} />
+              <Switch
+                value={balancearTimes}
+                onValueChange={setBalancearTimes}
+              />
             </View>
           )}
-          
+
           {autoSortear ? (
             <>
-              <TouchableOpacity style={styles.sortBtn} onPress={sortearJogadores}>
+              <TouchableOpacity
+                style={styles.sortBtn}
+                onPress={sortearJogadores}
+              >
                 <Text style={styles.sortBtnText}>
-                  {balancearTimes ? "Sortear times balanceados por habilidade e posição" : "Sortear jogadores aleatoriamente"}
+                  {balancearTimes
+                    ? "Sortear times balanceados por habilidade e posição"
+                    : "Sortear jogadores aleatoriamente"}
                 </Text>
               </TouchableOpacity>
-              
+
               <View style={styles.distributionButtons}>
-                <TouchableOpacity 
-                  style={[styles.distributionBtn, styles.saveBtn]} 
+                <TouchableOpacity
+                  style={[styles.distributionBtn, styles.saveBtn]}
                   onPress={() => setShowSaveModal(true)}
                   disabled={Object.keys(timesJogadores).length === 0}
                 >
-                  <Text style={styles.distributionBtnText}>💾 Salvar Distribuição</Text>
+                  <Text style={styles.distributionBtnText}>
+                    💾 Salvar Distribuição
+                  </Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.distributionBtn, styles.loadBtn]} 
+
+                <TouchableOpacity
+                  style={[styles.distributionBtn, styles.loadBtn]}
                   onPress={() => setShowLoadModal(true)}
                   disabled={savedDistributions.length === 0}
                 >
-                  <Text style={styles.distributionBtnText}>📂 Carregar Distribuição</Text>
+                  <Text style={styles.distributionBtnText}>
+                    📂 Carregar Distribuição
+                  </Text>
                 </TouchableOpacity>
               </View>
-              
+
               {Object.keys(timesJogadores).length > 0 && (
                 <View style={styles.infoContainer}>
                   <Text style={styles.infoTitle}>Informações dos times:</Text>
-                  {Object.keys(timesJogadores).map((timeNome) => {
-                    const media = calcularMediaHabilidade(timesJogadores[timeNome]);
+                  {Object.keys(timesJogadores).map((timeNome, index) => {
+                    const media = calcularMediaHabilidade(
+                      timesJogadores[timeNome]
+                    );
                     return (
-                      <Text key={timeNome} style={styles.infoText}>
-                        {timeNome}: {timesJogadores[timeNome].length} jogadores - Média de habilidade: {media.toFixed(1)}
+                      <Text
+                        key={`info-${index}-${timeNome}`}
+                        style={styles.infoText}
+                      >
+                        {timeNome}: {timesJogadores[timeNome].length} jogadores
+                        - Média de habilidade: {media.toFixed(1)}
                       </Text>
                     );
                   })}
@@ -301,17 +356,27 @@ export default function AssignPlayersScreen() {
               <Text style={styles.manualTitle}>
                 Selecione manualmente o time de cada jogador:
               </Text>
-              {jogadores.map((jogador) => (
-                <View key={jogador.name} style={styles.jogadorRow}>
+              {jogadores.map((jogador, playerIndex) => (
+                <View
+                  key={`player-${playerIndex}-${jogador.name}`}
+                  style={styles.jogadorRow}
+                >
                   <View style={styles.jogadorInfo}>
                     <Text style={styles.jogadorNome}>{jogador.name}</Text>
-                    <View style={{flexDirection: "row", alignItems: "center"}}>
-                      <Text style={styles.positionBadge}>{jogador.position}</Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <Text style={styles.positionBadge}>
+                        {jogador.position}
+                      </Text>
                       <View style={styles.skillStars}>
                         {[1, 2, 3, 4, 5].map((star) => (
-                          <Text 
-                            key={star} 
-                            style={[styles.starText, jogador.skill >= star ? styles.starActive : {}]}
+                          <Text
+                            key={star}
+                            style={[
+                              styles.starText,
+                              jogador.skill >= star ? styles.starActive : {},
+                            ]}
                           >
                             ★
                           </Text>
@@ -319,16 +384,16 @@ export default function AssignPlayersScreen() {
                       </View>
                     </View>
                   </View>
-                  <View style={{ flexDirection: 'row' }}>
-                    {times.map((item) => {
+                  <View style={{ flexDirection: "row" }}>
+                    {times.map((item, itemIndex) => {
                       // Verificar se o jogador está neste time
                       const jogadorNoTime = timesJogadores[item.name]?.some(
                         (j) => j.name === jogador.name
                       );
-                      
+
                       return (
                         <TouchableOpacity
-                          key={item.name}
+                          key={`button-${playerIndex}-${itemIndex}-${item.name}`}
                           style={[
                             styles.timeBtn,
                             jogadorNoTime && styles.timeBtnActive,
@@ -338,7 +403,9 @@ export default function AssignPlayersScreen() {
                               const novo = { ...prev };
                               // Remover o jogador de todos os times
                               Object.keys(novo).forEach((t) => {
-                                novo[t] = novo[t].filter((j) => j.name !== jogador.name);
+                                novo[t] = novo[t].filter(
+                                  (j) => j.name !== jogador.name
+                                );
                               });
                               // Adicionar o jogador ao time selecionado
                               if (!novo[item.name]) novo[item.name] = [];
@@ -363,29 +430,44 @@ export default function AssignPlayersScreen() {
               ))}
             </View>
           )}
-          {times.map((item) => (
-              <View key={item.name} style={styles.teamBox}>
-                <View style={styles.teamHeader}>
-                  <Text style={styles.teamTitle}>
-                    {item.name} {item.color ? `(${item.color})` : ""}
-                  </Text>
-                  {timesJogadores[item.name] && timesJogadores[item.name].length > 0 && (
+          {times.map((item, teamIndex) => (
+            <View key={`team-${teamIndex}-${item.name}`} style={styles.teamBox}>
+              <View style={styles.teamHeader}>
+                <Text style={styles.teamTitle}>
+                  {item.name} {item.color ? `(${item.color})` : ""}
+                </Text>
+                {timesJogadores[item.name] &&
+                  timesJogadores[item.name].length > 0 && (
                     <Text style={styles.teamSkillAvg}>
-                      Média: {calcularMediaHabilidade(timesJogadores[item.name]).toFixed(1)}
+                      Média:{" "}
+                      {calcularMediaHabilidade(
+                        timesJogadores[item.name]
+                      ).toFixed(1)}
                     </Text>
                   )}
-                </View>
-                {(timesJogadores[item.name] || []).map((jogador) => (
-                  <View key={jogador.name} style={styles.playerRow}>
+              </View>
+              {(timesJogadores[item.name] || []).map(
+                (jogador, jogadorIndex) => (
+                  <View
+                    key={`team-player-${teamIndex}-${jogadorIndex}-${jogador.name}`}
+                    style={styles.playerRow}
+                  >
                     <View style={styles.playerInfo}>
                       <Text style={styles.player}>{jogador.name}</Text>
-                      <View style={{flexDirection: "row", alignItems: "center"}}>
-                        <Text style={styles.positionBadgeSmall}>{jogador.position}</Text>
+                      <View
+                        style={{ flexDirection: "row", alignItems: "center" }}
+                      >
+                        <Text style={styles.positionBadgeSmall}>
+                          {jogador.position}
+                        </Text>
                         <View style={styles.skillStarsSmall}>
                           {[1, 2, 3, 4, 5].map((star) => (
-                            <Text 
-                              key={star} 
-                              style={[styles.starTextTiny, jogador.skill >= star ? styles.starActive : {}]}
+                            <Text
+                              key={star}
+                              style={[
+                                styles.starTextTiny,
+                                jogador.skill >= star ? styles.starActive : {},
+                              ]}
                             >
                               ★
                             </Text>
@@ -394,12 +476,13 @@ export default function AssignPlayersScreen() {
                       </View>
                     </View>
                   </View>
-                ))}
-              </View>
-            ))}
+                )
+              )}
+            </View>
+          ))}
         </View>
       </ScrollView>
-      
+
       {/* Modal para salvar distribuição */}
       <Modal
         visible={showSaveModal}
@@ -437,7 +520,7 @@ export default function AssignPlayersScreen() {
           </View>
         </View>
       </Modal>
-      
+
       {/* Modal para carregar distribuição */}
       <Modal
         visible={showLoadModal}
@@ -457,15 +540,21 @@ export default function AssignPlayersScreen() {
                 savedDistributions.map((distribution) => (
                   <View key={distribution.id} style={styles.distributionItem}>
                     <View style={styles.distributionInfo}>
-                      <Text style={styles.distributionItemName}>{distribution.name}</Text>
-                      <Text style={styles.distributionItemDate}>{distribution.date}</Text>
+                      <Text style={styles.distributionItemName}>
+                        {distribution.name}
+                      </Text>
+                      <Text style={styles.distributionItemDate}>
+                        {distribution.date}
+                      </Text>
                     </View>
                     <View style={styles.distributionActions}>
                       <TouchableOpacity
                         style={styles.loadDistributionBtn}
                         onPress={() => carregarDistribuicao(distribution)}
                       >
-                        <Text style={styles.loadDistributionBtnText}>Carregar</Text>
+                        <Text style={styles.loadDistributionBtnText}>
+                          Carregar
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.deleteDistributionBtn}
@@ -479,7 +568,11 @@ export default function AssignPlayersScreen() {
               )}
             </ScrollView>
             <TouchableOpacity
-              style={[styles.modalBtn, styles.cancelModalBtn, { marginTop: theme.spacing.md }]}
+              style={[
+                styles.modalBtn,
+                styles.cancelModalBtn,
+                { marginTop: theme.spacing.md },
+              ]}
               onPress={() => setShowLoadModal(false)}
             >
               <Text style={styles.cancelModalBtnText}>Fechar</Text>
@@ -498,7 +591,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: theme.spacing.md,
     justifyContent: "space-between",
-    ...theme.components.card
+    ...theme.components.card,
   },
   sortBtn: {
     ...theme.components.button,
@@ -520,7 +613,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: theme.spacing.sm,
-    ...theme.components.card
+    ...theme.components.card,
   },
   jogadorInfo: {
     flexDirection: "column",
@@ -607,7 +700,7 @@ const styles = StyleSheet.create({
   },
   teamBox: {
     marginBottom: theme.spacing.md,
-    ...theme.components.card
+    ...theme.components.card,
   },
   teamTitle: {
     ...theme.typography.h3,

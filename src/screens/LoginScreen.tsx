@@ -38,7 +38,7 @@ export default function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={[theme.colors.primary, theme.colors.card]}
+      colors={["#1e3c72", "#2a5298", "#4a90e2"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -47,10 +47,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.container}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={styles.content}>
           {/* Logo */}
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
@@ -75,11 +72,7 @@ export default function LoginScreen() {
 
             {/* Email Input */}
             <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={theme.colors.primary}
-              />
+              <Ionicons name="mail-outline" size={20} color="#4a90e2" />
               <TextInput
                 style={styles.input}
                 placeholder="E-mail"
@@ -95,11 +88,7 @@ export default function LoginScreen() {
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={theme.colors.primary}
-              />
+              <Ionicons name="lock-closed-outline" size={20} color="#4a90e2" />
               <TextInput
                 style={styles.input}
                 placeholder="Senha"
@@ -119,7 +108,7 @@ export default function LoginScreen() {
                 <Ionicons
                   name={showPassword ? "eye-outline" : "eye-off-outline"}
                   size={20}
-                  color={theme.colors.primary}
+                  color="#4a90e2"
                 />
               </TouchableOpacity>
             </View>
@@ -147,9 +136,7 @@ export default function LoginScreen() {
             >
               <LinearGradient
                 colors={
-                  loading
-                    ? ["#ccc", "#999"]
-                    : [theme.colors.primary, theme.colors.card]
+                  loading ? ["#ccc", "#999"] : ["#1e3c72", "#2a5298", "#4a90e2"]
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -171,14 +158,14 @@ export default function LoginScreen() {
               <Ionicons
                 name="information-circle-outline"
                 size={16}
-                color="rgba(255,255,255,0.7)"
+                color="#4a90e2"
               />
               <Text style={styles.infoText}>
                 Acesso restrito aos funcionários da Secretaria de Esporte
               </Text>
             </View>
           </View>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -191,85 +178,96 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
-    flexGrow: 1,
+  content: {
+    flex: 1,
     justifyContent: "center",
-    padding: 24,
+    padding: 20,
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 24,
   },
   logoCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    marginBottom: 12,
+    elevation: 12,
+    shadowColor: "#1e3c72",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    borderWidth: 3,
+    borderColor: "#4a90e2",
   },
   logoImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     resizeMode: "contain",
   },
   appTitle: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#fff",
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: "center",
-    textShadowColor: "rgba(0,0,0,0.3)",
-    textShadowOffset: { width: 1, height: 2 },
-    textShadowRadius: 4,
+    textShadowColor: "#1e3c72",
+    textShadowOffset: { width: 2, height: 3 },
+    textShadowRadius: 6,
+    letterSpacing: 1,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: "rgba(255,255,255,0.8)",
     textAlign: "center",
     fontWeight: "500",
   },
   formContainer: {
-    backgroundColor: "rgba(255,255,255,0.95)",
-    borderRadius: 20,
-    padding: 24,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderRadius: 16,
+    padding: 20,
+    elevation: 12,
+    shadowColor: "#1e3c72",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(74, 144, 226, 0.3)",
   },
   formTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
-    color: theme.colors.primary,
+    color: "#1e3c72",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   formSubtitle: {
     fontSize: 14,
     color: "rgba(0,0,0,0.6)",
     textAlign: "center",
-    marginBottom: 32,
+    marginBottom: 20,
     lineHeight: 20,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#f8fafc",
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
+    paddingVertical: 14,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: "rgba(74, 144, 226, 0.2)",
+    shadowColor: "#4a90e2",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   input: {
     flex: 1,
@@ -296,11 +294,11 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     borderRadius: 12,
-    elevation: 4,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    elevation: 6,
+    shadowColor: "#1e3c72",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
     marginBottom: 24,
   },
   loginButtonDisabled: {
@@ -325,16 +323,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(33, 150, 243, 0.1)",
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: "rgba(74, 144, 226, 0.15)",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(74, 144, 226, 0.3)",
   },
   infoText: {
     marginLeft: 8,
-    color: theme.colors.primary,
+    color: "#1e3c72",
     fontSize: 12,
     textAlign: "center",
     flex: 1,
     lineHeight: 16,
+    fontWeight: "600",
   },
 });

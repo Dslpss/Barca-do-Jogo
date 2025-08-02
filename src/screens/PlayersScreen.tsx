@@ -10,18 +10,10 @@ import {
   Modal,
   ScrollView,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
-
-// Definindo o tipo para jogador com habilidade e posição
-type Player = {
-  name: string;
-  skill: number; // 1-5 onde 5 é o mais habilidoso
-  position: string; // Posição do jogador (ex: Goleiro, Zagueiro, etc.)
-  yellowCards: number; // Número de cartões amarelos
-  redCards: number; // Número de cartões vermelhos
-};
+import { useData } from "../hooks/useData";
+import { Player } from "../services/dataService";
 
 // Lista de posições disponíveis
 const POSITIONS = [
@@ -30,92 +22,35 @@ const POSITIONS = [
   "Lateral",
   "Meio-Campo",
   "Atacante",
-  "Qualquer"
+  "Qualquer",
 ];
 
 export default function PlayersScreen() {
   const [player, setPlayer] = useState("");
-  const [players, setPlayers] = useState<Player[]>([]);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [editingSkill, setEditingSkill] = useState<number>(3); // Valor padrão médio
-  const [editingPosition, setEditingPosition] = useState<string>("Qualquer"); // Posição padrão para edição
-  const [playerSkill, setPlayerSkill] = useState<number>(3); // Habilidade para novos jogadores
-  const [playerPosition, setPlayerPosition] = useState<string>("Qualquer"); // Posição para novos jogadores
+  const [editingSkill, setEditingSkill] = useState<number>(3);
+  const [editingPosition, setEditingPosition] = useState<string>("Qualquer");
+  const [playerSkill, setPlayerSkill] = useState<number>(3);
+  const [playerPosition, setPlayerPosition] = useState<string>("Qualquer");
 
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      const saved = await AsyncStorage.getItem("players");
-      if (saved) {
-        try {
-          const parsedData = JSON.parse(saved);
-          // Verificar se os dados são do formato antigo (array de strings)
-          if (parsedData.length > 0 && typeof parsedData[0] === 'string') {
-            // Converter formato antigo para novo formato
-            const convertedPlayers = parsedData.map((name: string) => ({
-              name,
-              skill: 3, // Valor médio padrão para jogadores existentes
-              position: "Qualquer", // Posição padrão para jogadores existentes
-              yellowCards: 0, // Inicializa cartões amarelos
-              redCards: 0, // Inicializa cartões vermelhos
-            }));
-            setPlayers(convertedPlayers);
-            // Salvar no novo formato
-            await AsyncStorage.setItem("players", JSON.stringify(convertedPlayers));
-          } 
-          // Verificar se os dados são do formato sem posição
-          else if (parsedData.length > 0 && !parsedData[0].hasOwnProperty('position')) {
-            // Converter formato sem posição para novo formato
-            const convertedPlayers = parsedData.map((player: {name: string, skill: number}) => ({
-              ...player,
-              position: "Qualquer", // Posição padrão para jogadores existentes
-              yellowCards: 0, // Inicializa cartões amarelos
-              redCards: 0, // Inicializa cartões vermelhos
-            }));
-            setPlayers(convertedPlayers);
-            // Salvar no novo formato
-            await AsyncStorage.setItem("players", JSON.stringify(convertedPlayers));
-          } 
-          // Verificar se os dados são do formato sem cartões
-          else if (parsedData.length > 0 && (!parsedData[0].hasOwnProperty('yellowCards') || !parsedData[0].hasOwnProperty('redCards'))) {
-            // Converter formato sem cartões para novo formato
-            const convertedPlayers = parsedData.map((player: Player) => ({
-              ...player,
-              yellowCards: player.yellowCards || 0,
-              redCards: player.redCards || 0,
-            }));
-            setPlayers(convertedPlayers);
-            // Salvar no novo formato
-            await AsyncStorage.setItem("players", JSON.stringify(convertedPlayers));
-          } else {
-            setPlayers(parsedData);
-          }
-        } catch (e) {
-          console.error("Erro ao carregar jogadores:", e);
-          setPlayers([]);
-        }
-      } else {
-        setPlayers([]);
-      }
-    };
-    fetchPlayers();
-  }, []);
+  // Usando o hook useData para sincronização com Firebase
+  const { players, savePlayers, isLoading } = useData();
 
   const addPlayer = async () => {
     if (player.trim()) {
-      const newPlayer = {
+      const newPlayer: Player = {
         name: player.trim(),
         skill: playerSkill,
         position: playerPosition,
         yellowCards: 0,
-        redCards: 0
+        redCards: 0,
       };
       const newPlayers = [...players, newPlayer];
-      setPlayers(newPlayers);
+      await savePlayers(newPlayers);
       setPlayer("");
-      setPlayerSkill(3); // Resetar para o valor médio padrão
-      setPlayerPosition("Qualquer"); // Resetar para a posição padrão
-      await AsyncStorage.setItem("players", JSON.stringify(newPlayers));
+      setPlayerSkill(3);
+      setPlayerPosition("Qualquer");
     }
   };
 
@@ -133,14 +68,13 @@ export default function PlayersScreen() {
         ...players[editingIdx], // Mantém os valores existentes, incluindo cartões
         name: editingName.trim(),
         skill: editingSkill,
-        position: editingPosition
+        position: editingPosition,
       };
-      setPlayers(newPlayers);
+      await savePlayers(newPlayers);
       setEditingIdx(null);
       setEditingName("");
       setEditingSkill(3); // Resetar para o valor médio padrão
       setEditingPosition("Qualquer"); // Resetar para a posição padrão
-      await AsyncStorage.setItem("players", JSON.stringify(newPlayers));
     }
   };
 
@@ -153,13 +87,15 @@ export default function PlayersScreen() {
 
   const deletePlayer = async (idx: number) => {
     const newPlayers = players.filter((_, i) => i !== idx);
-    setPlayers(newPlayers);
-    await AsyncStorage.setItem("players", JSON.stringify(newPlayers));
+    await savePlayers(newPlayers);
     if (editingIdx === idx) cancelEditPlayer();
   };
-  
+
   // Renderiza as estrelas para seleção de habilidade
-  const renderStars = (currentValue: number, onChange: (value: number) => void) => {
+  const renderStars = (
+    currentValue: number,
+    onChange: (value: number) => void
+  ) => {
     return (
       <View style={styles.starsContainer}>
         <Text style={styles.skillLabel}>Nível de habilidade:</Text>
@@ -170,7 +106,12 @@ export default function PlayersScreen() {
               onPress={() => onChange(star)}
               style={styles.starButton}
             >
-              <Text style={[styles.starText, currentValue >= star ? styles.starActive : {}]}>
+              <Text
+                style={[
+                  styles.starText,
+                  currentValue >= star ? styles.starActive : {},
+                ]}
+              >
                 ★
               </Text>
             </TouchableOpacity>
@@ -181,7 +122,10 @@ export default function PlayersScreen() {
   };
 
   // Renderiza o seletor de posição
-  const renderPositionSelector = (currentPosition: string, onChange: (position: string) => void) => {
+  const renderPositionSelector = (
+    currentPosition: string,
+    onChange: (position: string) => void
+  ) => {
     return (
       <View style={styles.positionContainer}>
         <Text style={styles.positionLabel}>Posição:</Text>
@@ -192,13 +136,15 @@ export default function PlayersScreen() {
               onPress={() => onChange(position)}
               style={[
                 styles.positionButton,
-                currentPosition === position ? styles.positionButtonActive : {}
+                currentPosition === position ? styles.positionButtonActive : {},
               ]}
             >
-              <Text 
+              <Text
                 style={[
-                  styles.positionButtonText, 
-                  currentPosition === position ? styles.positionButtonTextActive : {}
+                  styles.positionButtonText,
+                  currentPosition === position
+                    ? styles.positionButtonTextActive
+                    : {},
                 ]}
               >
                 {position}
@@ -237,7 +183,9 @@ export default function PlayersScreen() {
       <FlatList
         data={players}
         keyboardShouldPersistTaps="handled"
-        keyExtractor={(item, index) => index.toString()}
+        keyExtractor={(item, index) =>
+          item.id || `player-${index}-${item.name}`
+        }
         renderItem={({ item, index }) => (
           <View style={styles.playerCard}>
             {editingIdx === index ? (
@@ -248,11 +196,14 @@ export default function PlayersScreen() {
                   flex: 1,
                 }}
               >
-                <View style={{flex: 1}}>
+                <View style={{ flex: 1 }}>
                   <TextInput
                     style={[
                       styles.input,
-                      { marginRight: 8, backgroundColor: theme.colors.background },
+                      {
+                        marginRight: 8,
+                        backgroundColor: theme.colors.background,
+                      },
                     ]}
                     value={editingName}
                     onChangeText={setEditingName}
@@ -262,7 +213,7 @@ export default function PlayersScreen() {
                   {renderStars(editingSkill, setEditingSkill)}
                   {renderPositionSelector(editingPosition, setEditingPosition)}
                 </View>
-                <View style={{flexDirection: 'column'}}>
+                <View style={{ flexDirection: "column" }}>
                   <TouchableOpacity
                     style={styles.saveBtn}
                     onPress={saveEditPlayer}
@@ -270,7 +221,7 @@ export default function PlayersScreen() {
                     <Text style={styles.saveBtnText}>Salvar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.cancelBtn, {marginTop: 4}]}
+                    style={[styles.cancelBtn, { marginTop: 4 }]}
                     onPress={cancelEditPlayer}
                   >
                     <Text style={styles.cancelBtnText}>Cancelar</Text>
@@ -287,13 +238,16 @@ export default function PlayersScreen() {
               >
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName}>{item.name}</Text>
-                  <View style={{flexDirection: "row", alignItems: "center"}}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <Text style={styles.positionText}>{item.position}</Text>
                     <View style={styles.skillStars}>
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Text 
-                          key={star} 
-                          style={[styles.starTextSmall, item.skill >= star ? styles.starActive : {}]}
+                        <Text
+                          key={star}
+                          style={[
+                            styles.starTextSmall,
+                            item.skill >= star ? styles.starActive : {},
+                          ]}
                         >
                           ★
                         </Text>
@@ -304,30 +258,28 @@ export default function PlayersScreen() {
                     <View style={styles.cardItem}>
                       <Text style={styles.cardIcon}>🟨</Text>
                       <Text style={styles.cardCount}>{item.yellowCards}</Text>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.cardButton}
-                        onPress={() => {
+                        onPress={async () => {
                           const updatedPlayers = [...players];
                           updatedPlayers[index] = {
                             ...item,
-                            yellowCards: item.yellowCards + 1
+                            yellowCards: item.yellowCards + 1,
                           };
-                          setPlayers(updatedPlayers);
-                          AsyncStorage.setItem("players", JSON.stringify(updatedPlayers));
+                          await savePlayers(updatedPlayers);
                         }}
                       >
                         <Text style={styles.cardButtonText}>+</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.cardButton}
-                        onPress={() => {
+                        onPress={async () => {
                           const updatedPlayers = [...players];
                           updatedPlayers[index] = {
                             ...item,
-                            yellowCards: Math.max(0, item.yellowCards - 1)
+                            yellowCards: Math.max(0, item.yellowCards - 1),
                           };
-                          setPlayers(updatedPlayers);
-                          AsyncStorage.setItem("players", JSON.stringify(updatedPlayers));
+                          await savePlayers(updatedPlayers);
                         }}
                       >
                         <Text style={styles.cardButtonText}>-</Text>
@@ -336,30 +288,28 @@ export default function PlayersScreen() {
                     <View style={styles.cardItem}>
                       <Text style={styles.cardIcon}>🟥</Text>
                       <Text style={styles.cardCount}>{item.redCards}</Text>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.cardButton}
-                        onPress={() => {
+                        onPress={async () => {
                           const updatedPlayers = [...players];
                           updatedPlayers[index] = {
                             ...item,
-                            redCards: item.redCards + 1
+                            redCards: item.redCards + 1,
                           };
-                          setPlayers(updatedPlayers);
-                          AsyncStorage.setItem("players", JSON.stringify(updatedPlayers));
+                          await savePlayers(updatedPlayers);
                         }}
                       >
                         <Text style={styles.cardButtonText}>+</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.cardButton}
-                        onPress={() => {
+                        onPress={async () => {
                           const updatedPlayers = [...players];
                           updatedPlayers[index] = {
                             ...item,
-                            redCards: Math.max(0, item.redCards - 1)
+                            redCards: Math.max(0, item.redCards - 1),
                           };
-                          setPlayers(updatedPlayers);
-                          AsyncStorage.setItem("players", JSON.stringify(updatedPlayers));
+                          await savePlayers(updatedPlayers);
                         }}
                       >
                         <Text style={styles.cardButtonText}>-</Text>
@@ -409,7 +359,7 @@ const styles = StyleSheet.create({
     ...theme.typography.h2,
     color: theme.colors.primary,
     marginBottom: theme.spacing.lg,
-    textAlign: 'center',
+    textAlign: "center",
   },
   listTitle: {
     ...theme.typography.h3,
@@ -464,7 +414,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.error,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.xs
+    marginTop: theme.spacing.xs,
   },
   cancelBtnText: {
     color: theme.colors.white,

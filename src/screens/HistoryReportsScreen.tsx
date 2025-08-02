@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -13,8 +13,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
-import * as Print from 'expo-print';
-import { shareAsync } from 'expo-sharing';
+import * as Print from "expo-print";
+import { shareAsync } from "expo-sharing";
 
 interface Jogador {
   id: string;
@@ -73,17 +73,37 @@ interface EstatisticaTime {
 
 export function HistoryReportsScreen() {
   const isFocused = useIsFocused();
-  const [distribuicoesSalvas, setDistribuicoesSalvas] = useState<DistribuicaoSalva[]>([]);
+  const keyCounter = useRef(0);
+
+  // Gerador de keys únicas
+  const generateUniqueKey = (prefix: string) => {
+    keyCounter.current += 1;
+    return `${prefix}-${Date.now()}-${keyCounter.current}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+  };
+
+  const [distribuicoesSalvas, setDistribuicoesSalvas] = useState<
+    DistribuicaoSalva[]
+  >([]);
   const [resultados, setResultados] = useState<Resultado[]>([]);
-  const [estatisticasJogadores, setEstatisticasJogadores] = useState<EstatisticaJogador[]>([]);
-  const [estatisticasTimes, setEstatisticasTimes] = useState<EstatisticaTime[]>([]);
-  const [abaSelecionada, setAbaSelecionada] = useState<'sorteios' | 'jogadores' | 'times' | 'exportar'>('sorteios');
+  const [estatisticasJogadores, setEstatisticasJogadores] = useState<
+    EstatisticaJogador[]
+  >([]);
+  const [estatisticasTimes, setEstatisticasTimes] = useState<EstatisticaTime[]>(
+    []
+  );
+  const [abaSelecionada, setAbaSelecionada] = useState<
+    "sorteios" | "jogadores" | "times" | "exportar"
+  >("sorteios");
 
   useEffect(() => {
     const carregarDados = async () => {
       try {
         const distribuicoes = await AsyncStorage.getItem("savedDistributions");
-        const distribuicoesData = distribuicoes ? JSON.parse(distribuicoes) : [];
+        const distribuicoesData = distribuicoes
+          ? JSON.parse(distribuicoes)
+          : [];
         setDistribuicoesSalvas(distribuicoesData);
 
         const resultadosJSON = await AsyncStorage.getItem("resultados_jogos");
@@ -108,29 +128,54 @@ export function HistoryReportsScreen() {
     }
   }, [resultados, distribuicoesSalvas]);
 
-  const getTimesFromDistribuicao = (dist: DistribuicaoSalva): Time[] => dist.teams || dist.times || [];
-  const getDateFromDistribuicao = (dist: DistribuicaoSalva): string => dist.date || dist.data;
+  const getTimesFromDistribuicao = (dist: DistribuicaoSalva): Time[] =>
+    dist.teams || dist.times || [];
+  const getDateFromDistribuicao = (dist: DistribuicaoSalva): string =>
+    dist.date || dist.data;
 
-  const findLatestDistributionForGame = (distribuicoes: DistribuicaoSalva[], nomeTimeA: string, nomeTimeB: string): DistribuicaoSalva | undefined => {
+  const findLatestDistributionForGame = (
+    distribuicoes: DistribuicaoSalva[],
+    nomeTimeA: string,
+    nomeTimeB: string
+  ): DistribuicaoSalva | undefined => {
     return distribuicoes
-      .filter(d => {
+      .filter((d) => {
         const times = getTimesFromDistribuicao(d);
-        return times.some(t => t.nome === nomeTimeA) && times.some(t => t.nome === nomeTimeB);
+        return (
+          times.some((t) => t.nome === nomeTimeA) &&
+          times.some((t) => t.nome === nomeTimeB)
+        );
       })
-      .sort((a, b) => new Date(getDateFromDistribuicao(b)).getTime() - new Date(getDateFromDistribuicao(a)).getTime())[0];
+      .sort(
+        (a, b) =>
+          new Date(getDateFromDistribuicao(b)).getTime() -
+          new Date(getDateFromDistribuicao(a)).getTime()
+      )[0];
   };
 
-  const inicializarEstatisticas = (distribuicoes: DistribuicaoSalva[], resultados: Resultado[]) => {
+  const inicializarEstatisticas = (
+    distribuicoes: DistribuicaoSalva[],
+    resultados: Resultado[]
+  ) => {
     const statsJogadores: Record<string, EstatisticaJogador> = {};
     const statsTimes: Record<string, EstatisticaTime> = {};
 
     if (distribuicoes.length > 0) {
-      distribuicoes.forEach(dist => {
-        getTimesFromDistribuicao(dist).forEach(time => {
+      distribuicoes.forEach((dist) => {
+        getTimesFromDistribuicao(dist).forEach((time) => {
           if (time && time.jogadores && Array.isArray(time.jogadores)) {
-            time.jogadores.forEach(jogador => {
+            time.jogadores.forEach((jogador) => {
               if (jogador && jogador.nome && !statsJogadores[jogador.nome]) {
-                statsJogadores[jogador.nome] = { nome: jogador.nome, jogos: 0, vitorias: 0, empates: 0, derrotas: 0, golsPro: 0, golsContra: 0, percentualVitorias: 0 };
+                statsJogadores[jogador.nome] = {
+                  nome: jogador.nome,
+                  jogos: 0,
+                  vitorias: 0,
+                  empates: 0,
+                  derrotas: 0,
+                  golsPro: 0,
+                  golsContra: 0,
+                  percentualVitorias: 0,
+                };
               }
             });
           }
@@ -138,38 +183,82 @@ export function HistoryReportsScreen() {
       });
     } else {
       const timesUnicos = new Set<string>();
-      resultados.forEach(r => {
+      resultados.forEach((r) => {
         if (r.timeA) timesUnicos.add(r.timeA);
         if (r.timeB) timesUnicos.add(r.timeB);
       });
-      timesUnicos.forEach(nomeTime => {
+      timesUnicos.forEach((nomeTime) => {
         const nomeJogador = `Time ${nomeTime}`;
         if (!statsJogadores[nomeJogador]) {
-          statsJogadores[nomeJogador] = { nome: nomeJogador, jogos: 0, vitorias: 0, empates: 0, derrotas: 0, golsPro: 0, golsContra: 0, percentualVitorias: 0 };
+          statsJogadores[nomeJogador] = {
+            nome: nomeJogador,
+            jogos: 0,
+            vitorias: 0,
+            empates: 0,
+            derrotas: 0,
+            golsPro: 0,
+            golsContra: 0,
+            percentualVitorias: 0,
+          };
         }
       });
     }
 
-    resultados.forEach(r => {
+    resultados.forEach((r) => {
       if (r.timeA && !statsTimes[r.timeA]) {
-        statsTimes[r.timeA] = { nome: r.timeA, cor: '', jogos: 0, vitorias: 0, empates: 0, derrotas: 0, golsPro: 0, golsContra: 0, saldoGols: 0, pontos: 0, percentualVitorias: 0 };
+        statsTimes[r.timeA] = {
+          nome: r.timeA,
+          cor: "",
+          jogos: 0,
+          vitorias: 0,
+          empates: 0,
+          derrotas: 0,
+          golsPro: 0,
+          golsContra: 0,
+          saldoGols: 0,
+          pontos: 0,
+          percentualVitorias: 0,
+        };
       }
       if (r.timeB && !statsTimes[r.timeB]) {
-        statsTimes[r.timeB] = { nome: r.timeB, cor: '', jogos: 0, vitorias: 0, empates: 0, derrotas: 0, golsPro: 0, golsContra: 0, saldoGols: 0, pontos: 0, percentualVitorias: 0 };
+        statsTimes[r.timeB] = {
+          nome: r.timeB,
+          cor: "",
+          jogos: 0,
+          vitorias: 0,
+          empates: 0,
+          derrotas: 0,
+          golsPro: 0,
+          golsContra: 0,
+          saldoGols: 0,
+          pontos: 0,
+          percentualVitorias: 0,
+        };
       }
     });
 
     return { statsJogadores, statsTimes };
   };
 
-  const calcularEstatisticas = (resultados: Resultado[], distribuicoes: DistribuicaoSalva[]) => {
+  const calcularEstatisticas = (
+    resultados: Resultado[],
+    distribuicoes: DistribuicaoSalva[]
+  ) => {
     try {
-      const { statsJogadores, statsTimes } = inicializarEstatisticas(distribuicoes, resultados);
+      const { statsJogadores, statsTimes } = inicializarEstatisticas(
+        distribuicoes,
+        resultados
+      );
 
       for (const resultado of resultados) {
         if (!resultado || !resultado.timeA || !resultado.timeB) continue;
 
-        const { timeA: nomeTimeA, timeB: nomeTimeB, placarA = 0, placarB = 0 } = resultado;
+        const {
+          timeA: nomeTimeA,
+          timeB: nomeTimeB,
+          placarA = 0,
+          placarB = 0,
+        } = resultado;
 
         // Atualiza estatísticas dos times
         if (statsTimes[nomeTimeA]) {
@@ -183,18 +272,31 @@ export function HistoryReportsScreen() {
           statsTimes[nomeTimeB].golsContra += placarA;
         }
 
-        const distribuicaoDoJogo = distribuicoes.length > 0 ? findLatestDistributionForGame(distribuicoes, nomeTimeA, nomeTimeB) : undefined;
+        const distribuicaoDoJogo =
+          distribuicoes.length > 0
+            ? findLatestDistributionForGame(distribuicoes, nomeTimeA, nomeTimeB)
+            : undefined;
 
-        const atualizarStatsJogadores = (timeData: Time | undefined, golsPro: number, golsContra: number, resultado: 'vitoria' | 'derrota' | 'empate') => {
-          if (!timeData || !timeData.jogadores || !Array.isArray(timeData.jogadores)) return;
-          timeData.jogadores.forEach(jogador => {
+        const atualizarStatsJogadores = (
+          timeData: Time | undefined,
+          golsPro: number,
+          golsContra: number,
+          resultado: "vitoria" | "derrota" | "empate"
+        ) => {
+          if (
+            !timeData ||
+            !timeData.jogadores ||
+            !Array.isArray(timeData.jogadores)
+          )
+            return;
+          timeData.jogadores.forEach((jogador) => {
             if (jogador && jogador.nome && statsJogadores[jogador.nome]) {
               const stats = statsJogadores[jogador.nome];
               stats.jogos++;
               stats.golsPro += golsPro;
               stats.golsContra += golsContra;
-              if (resultado === 'vitoria') stats.vitorias++;
-              else if (resultado === 'derrota') stats.derrotas++;
+              if (resultado === "vitoria") stats.vitorias++;
+              else if (resultado === "derrota") stats.derrotas++;
               else stats.empates++;
             }
           });
@@ -202,35 +304,43 @@ export function HistoryReportsScreen() {
 
         if (distribuicaoDoJogo) {
           const timesDoJogo = getTimesFromDistribuicao(distribuicaoDoJogo);
-          const timeAData = timesDoJogo.find(t => t.nome === nomeTimeA);
-          const timeBData = timesDoJogo.find(t => t.nome === nomeTimeB);
+          const timeAData = timesDoJogo.find((t) => t.nome === nomeTimeA);
+          const timeBData = timesDoJogo.find((t) => t.nome === nomeTimeB);
 
           if (placarA > placarB) {
-            atualizarStatsJogadores(timeAData, placarA, placarB, 'vitoria');
-            atualizarStatsJogadores(timeBData, placarB, placarA, 'derrota');
+            atualizarStatsJogadores(timeAData, placarA, placarB, "vitoria");
+            atualizarStatsJogadores(timeBData, placarB, placarA, "derrota");
           } else if (placarB > placarA) {
-            atualizarStatsJogadores(timeAData, placarA, placarB, 'derrota');
-            atualizarStatsJogadores(timeBData, placarB, placarA, 'vitoria');
+            atualizarStatsJogadores(timeAData, placarA, placarB, "derrota");
+            atualizarStatsJogadores(timeBData, placarB, placarA, "vitoria");
           } else {
-            atualizarStatsJogadores(timeAData, placarA, placarB, 'empate');
-            atualizarStatsJogadores(timeBData, placarB, placarA, 'empate');
+            atualizarStatsJogadores(timeAData, placarA, placarB, "empate");
+            atualizarStatsJogadores(timeBData, placarB, placarA, "empate");
           }
         } else {
-            const jogadorTimeA = `Time ${nomeTimeA}`;
-            const jogadorTimeB = `Time ${nomeTimeB}`;
-            if(statsJogadores[jogadorTimeA]) statsJogadores[jogadorTimeA].jogos++;
-            if(statsJogadores[jogadorTimeB]) statsJogadores[jogadorTimeB].jogos++;
+          const jogadorTimeA = `Time ${nomeTimeA}`;
+          const jogadorTimeB = `Time ${nomeTimeB}`;
+          if (statsJogadores[jogadorTimeA])
+            statsJogadores[jogadorTimeA].jogos++;
+          if (statsJogadores[jogadorTimeB])
+            statsJogadores[jogadorTimeB].jogos++;
 
-            if (placarA > placarB) {
-                if(statsJogadores[jogadorTimeA]) statsJogadores[jogadorTimeA].vitorias++;
-                if(statsJogadores[jogadorTimeB]) statsJogadores[jogadorTimeB].derrotas++;
-            } else if (placarB > placarA) {
-                if(statsJogadores[jogadorTimeA]) statsJogadores[jogadorTimeA].derrotas++;
-                if(statsJogadores[jogadorTimeB]) statsJogadores[jogadorTimeB].vitorias++;
-            } else {
-                if(statsJogadores[jogadorTimeA]) statsJogadores[jogadorTimeA].empates++;
-                if(statsJogadores[jogadorTimeB]) statsJogadores[jogadorTimeB].empates++;
-            }
+          if (placarA > placarB) {
+            if (statsJogadores[jogadorTimeA])
+              statsJogadores[jogadorTimeA].vitorias++;
+            if (statsJogadores[jogadorTimeB])
+              statsJogadores[jogadorTimeB].derrotas++;
+          } else if (placarB > placarA) {
+            if (statsJogadores[jogadorTimeA])
+              statsJogadores[jogadorTimeA].derrotas++;
+            if (statsJogadores[jogadorTimeB])
+              statsJogadores[jogadorTimeB].vitorias++;
+          } else {
+            if (statsJogadores[jogadorTimeA])
+              statsJogadores[jogadorTimeA].empates++;
+            if (statsJogadores[jogadorTimeB])
+              statsJogadores[jogadorTimeB].empates++;
+          }
         }
 
         // Atualiza pontos e resultado dos times
@@ -263,22 +373,36 @@ export function HistoryReportsScreen() {
       }
 
       // Finaliza cálculos e ordena
-      const timesArray = Object.values(statsTimes).map(time => ({
-        ...time,
-        saldoGols: time.golsPro - time.golsContra,
-        percentualVitorias: time.jogos > 0 ? (time.vitorias / time.jogos) * 100 : 0,
-      })).sort((a, b) => b.pontos - a.pontos || b.saldoGols - a.saldoGols || b.golsPro - a.golsPro);
+      const timesArray = Object.values(statsTimes)
+        .map((time) => ({
+          ...time,
+          saldoGols: time.golsPro - time.golsContra,
+          percentualVitorias:
+            time.jogos > 0 ? (time.vitorias / time.jogos) * 100 : 0,
+        }))
+        .sort(
+          (a, b) =>
+            b.pontos - a.pontos ||
+            b.saldoGols - a.saldoGols ||
+            b.golsPro - a.golsPro
+        );
 
-      const jogadoresArray = Object.values(statsJogadores).map(jogador => ({
-        ...jogador,
-        percentualVitorias: jogador.jogos > 0 ? (jogador.vitorias / jogador.jogos) * 100 : 0,
-      })).sort((a, b) => b.vitorias - a.vitorias || b.percentualVitorias - a.percentualVitorias);
+      const jogadoresArray = Object.values(statsJogadores)
+        .map((jogador) => ({
+          ...jogador,
+          percentualVitorias:
+            jogador.jogos > 0 ? (jogador.vitorias / jogador.jogos) * 100 : 0,
+        }))
+        .sort(
+          (a, b) =>
+            b.vitorias - a.vitorias ||
+            b.percentualVitorias - a.percentualVitorias
+        );
 
       setEstatisticasTimes(timesArray);
       setEstatisticasJogadores(jogadoresArray);
-
     } catch (error) {
-      console.error('Erro ao calcular estatísticas:', error);
+      console.error("Erro ao calcular estatísticas:", error);
       setEstatisticasTimes([]);
       setEstatisticasJogadores([]);
     }
@@ -301,7 +425,7 @@ export function HistoryReportsScreen() {
             </style>
           </head>
           <body>
-            <h1>Relatório do Campeonato - Barca do Jogo</h1>
+            <h1>Relatório do Campeonato - L.E.L</h1>
             
             <div class="section">
               <h2>Classificação dos Times</h2>
@@ -319,10 +443,13 @@ export function HistoryReportsScreen() {
                   <th>Pontos</th>
                   <th>% Vitórias</th>
                 </tr>
-                ${(estatisticasTimes || []).filter(t => t?.nome).map((time: EstatisticaTime, index: number) => `
+                ${(estatisticasTimes || [])
+                  .filter((t) => t?.nome)
+                  .map(
+                    (time: EstatisticaTime, index: number) => `
                   <tr>
                     <td>${index + 1}º</td>
-                    <td>${time?.nome || 'N/A'}</td>
+                    <td>${time?.nome || "N/A"}</td>
                     <td>${time?.jogos || 0}</td>
                     <td>${time?.vitorias || 0}</td>
                     <td>${time?.empates || 0}</td>
@@ -331,9 +458,11 @@ export function HistoryReportsScreen() {
                     <td>${time?.golsContra || 0}</td>
                     <td>${time?.saldoGols || 0}</td>
                     <td>${time?.pontos || 0}</td>
-                    <td>${time?.percentualVitorias?.toFixed(1) || '0.0'}%</td>
+                    <td>${time?.percentualVitorias?.toFixed(1) || "0.0"}%</td>
                   </tr>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </table>
             </div>
             
@@ -350,18 +479,25 @@ export function HistoryReportsScreen() {
                   <th>Gols Contra</th>
                   <th>% Vitórias</th>
                 </tr>
-                ${(estatisticasJogadores || []).filter(j => j?.nome).map((jogador: EstatisticaJogador) => `
+                ${(estatisticasJogadores || [])
+                  .filter((j) => j?.nome)
+                  .map(
+                    (jogador: EstatisticaJogador) => `
                   <tr>
-                    <td>${jogador?.nome || 'N/A'}</td>
+                    <td>${jogador?.nome || "N/A"}</td>
                     <td>${jogador?.jogos || 0}</td>
                     <td>${jogador?.vitorias || 0}</td>
                     <td>${jogador?.empates || 0}</td>
                     <td>${jogador?.derrotas || 0}</td>
                     <td>${jogador?.golsPro || 0}</td>
                     <td>${jogador?.golsContra || 0}</td>
-                    <td>${jogador?.percentualVitorias?.toFixed(1) || '0.0'}%</td>
+                    <td>${
+                      jogador?.percentualVitorias?.toFixed(1) || "0.0"
+                    }%</td>
                   </tr>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </table>
             </div>
             
@@ -373,18 +509,29 @@ export function HistoryReportsScreen() {
                   <th>Data</th>
                   <th>Número de Times</th>
                 </tr>
-                ${(distribuicoesSalvas || []).filter(d => d?.nome).map((dist: DistribuicaoSalva) => `
+                ${(distribuicoesSalvas || [])
+                  .filter((d) => d?.nome)
+                  .map(
+                    (dist: DistribuicaoSalva) => `
                   <tr>
-                    <td>${dist?.nome || 'N/A'}</td>
-                    <td>${dist?.data ? new Date(dist.data).toLocaleDateString('pt-BR') : 'N/A'}</td>
+                    <td>${dist?.nome || "N/A"}</td>
+                    <td>${
+                      dist?.data
+                        ? new Date(dist.data).toLocaleDateString("pt-BR")
+                        : "N/A"
+                    }</td>
                     <td>${dist?.times?.length || 0}</td>
                   </tr>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </table>
             </div>
             
             <p style="text-align: center; margin-top: 50px; color: #666;">
-              Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+              Relatório gerado em ${new Date().toLocaleDateString(
+                "pt-BR"
+              )} às ${new Date().toLocaleTimeString("pt-BR")}
             </p>
           </body>
         </html>
@@ -392,12 +539,12 @@ export function HistoryReportsScreen() {
 
       const { uri } = await Print.printToFileAsync({
         html: htmlContent,
-        base64: false
+        base64: false,
       });
 
       await shareAsync(uri, {
-        UTI: '.pdf',
-        mimeType: 'application/pdf'
+        UTI: ".pdf",
+        mimeType: "application/pdf",
       });
 
       Alert.alert(
@@ -413,13 +560,25 @@ export function HistoryReportsScreen() {
 
   const renderContent = () => {
     switch (abaSelecionada) {
-      case 'sorteios':
-        return <HistoricoSorteios distribuicoes={distribuicoesSalvas} styles={styles} />;
-      case 'jogadores':
-        return <EstatisticasJogadores estatisticas={estatisticasJogadores} styles={styles} />;
-      case 'times':
-        return <EstatisticasTimes estatisticas={estatisticasTimes} styles={styles} />;
-      case 'exportar':
+      case "sorteios":
+        return (
+          <HistoricoSorteios
+            distribuicoes={distribuicoesSalvas}
+            styles={styles}
+          />
+        );
+      case "jogadores":
+        return (
+          <EstatisticasJogadores
+            estatisticas={estatisticasJogadores}
+            styles={styles}
+          />
+        );
+      case "times":
+        return (
+          <EstatisticasTimes estatisticas={estatisticasTimes} styles={styles} />
+        );
+      case "exportar":
         return <Exportacao onExport={exportarPDF} styles={styles} />;
       default:
         return null;
@@ -428,18 +587,40 @@ export function HistoryReportsScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Histórico & Relatórios" theme="light" icon="stats-chart" />
-      
+      <AppHeader
+        title="Histórico & Relatórios"
+        theme="light"
+        icon="stats-chart"
+      />
+
       <View style={styles.tabContainer}>
-        <TabButton title="📋 Sorteios" active={abaSelecionada === 'sorteios'} onPress={() => setAbaSelecionada('sorteios')} styles={styles} />
-        <TabButton title="👤 Jogadores" active={abaSelecionada === 'jogadores'} onPress={() => setAbaSelecionada('jogadores')} styles={styles} />
-        <TabButton title="⚽ Times" active={abaSelecionada === 'times'} onPress={() => setAbaSelecionada('times')} styles={styles} />
-        <TabButton title="📊 Exportar" active={abaSelecionada === 'exportar'} onPress={() => setAbaSelecionada('exportar')} styles={styles} />
+        <TabButton
+          title="📋 Sorteios"
+          active={abaSelecionada === "sorteios"}
+          onPress={() => setAbaSelecionada("sorteios")}
+          styles={styles}
+        />
+        <TabButton
+          title="👤 Jogadores"
+          active={abaSelecionada === "jogadores"}
+          onPress={() => setAbaSelecionada("jogadores")}
+          styles={styles}
+        />
+        <TabButton
+          title="⚽ Times"
+          active={abaSelecionada === "times"}
+          onPress={() => setAbaSelecionada("times")}
+          styles={styles}
+        />
+        <TabButton
+          title="📊 Exportar"
+          active={abaSelecionada === "exportar"}
+          onPress={() => setAbaSelecionada("exportar")}
+          styles={styles}
+        />
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        {renderContent()}
-      </ScrollView>
+      <ScrollView style={styles.scrollView}>{renderContent()}</ScrollView>
     </View>
   );
 }
@@ -453,7 +634,8 @@ interface TabButtonProps extends ComponentProps {
 const TabButton = ({ title, active, onPress, styles }: TabButtonProps) => (
   <TouchableOpacity
     style={[styles.tab, active && styles.tabActive]}
-    onPress={onPress}>
+    onPress={onPress}
+  >
     <Text style={[styles.tabText, active && styles.tabTextActive]}>
       {title}
     </Text>
@@ -508,7 +690,10 @@ interface ExportacaoProps extends ComponentProps {
   onExport: () => Promise<void>;
 }
 
-const HistoricoSorteios = ({ distribuicoes, styles }: HistoricoSorteiosProps) => (
+const HistoricoSorteios = ({
+  distribuicoes,
+  styles,
+}: HistoricoSorteiosProps) => (
   <View style={styles.tabContent}>
     <Text style={styles.sectionTitle}>Histórico de Sorteios Realizados</Text>
     {distribuicoes.length === 0 ? (
@@ -518,21 +703,38 @@ const HistoricoSorteios = ({ distribuicoes, styles }: HistoricoSorteiosProps) =>
         const times = distribuicao.teams || distribuicao.times || [];
         const totalJogadores = Array.isArray(times)
           ? times.reduce((total: number, time: Time) => {
-              return total + (time?.jogadores && Array.isArray(time.jogadores) ? time.jogadores.length : 0);
+              return (
+                total +
+                (time?.jogadores && Array.isArray(time.jogadores)
+                  ? time.jogadores.length
+                  : 0)
+              );
             }, 0)
           : 0;
-        
+
         const dataDistribuicao = distribuicao.date || distribuicao.data;
-        const dataValida = dataDistribuicao && !isNaN(new Date(dataDistribuicao).getTime());
-        
+        const dataValida =
+          dataDistribuicao && !isNaN(new Date(dataDistribuicao).getTime());
+
         return (
-          <View key={`${distribuicao.id || index}-${dataDistribuicao || index}`} style={styles.historyItem}>
-            <Text style={styles.historyTitle}>{(distribuicao.nome || distribuicao.name || '').trim() || 'Sorteio sem nome'}</Text>
+          <View
+            key={`distribuicao-${index}-${
+              distribuicao.id || "no-id"
+            }-${Math.random().toString(36).substr(2, 9)}`}
+            style={styles.historyItem}
+          >
+            <Text style={styles.historyTitle}>
+              {(distribuicao.nome || distribuicao.name || "").trim() ||
+                "Sorteio sem nome"}
+            </Text>
             <Text style={styles.historyDate}>
-              {dataValida 
-                ? `${new Date(dataDistribuicao).toLocaleDateString('pt-BR')} às ${new Date(dataDistribuicao).toLocaleTimeString('pt-BR')}`
-                : 'Data não disponível'
-              }
+              {dataValida
+                ? `${new Date(dataDistribuicao).toLocaleDateString(
+                    "pt-BR"
+                  )} às ${new Date(dataDistribuicao).toLocaleTimeString(
+                    "pt-BR"
+                  )}`
+                : "Data não disponível"}
             </Text>
             <Text style={styles.historyDetails}>
               {times?.length || 0} teams • {totalJogadores || 0} jogadores
@@ -544,7 +746,10 @@ const HistoricoSorteios = ({ distribuicoes, styles }: HistoricoSorteiosProps) =>
   </View>
 );
 
-const EstatisticasJogadores = ({ estatisticas, styles }: EstatisticasJogadoresProps) => (
+const EstatisticasJogadores = ({
+  estatisticas,
+  styles,
+}: EstatisticasJogadoresProps) => (
   <View style={styles.tabContent}>
     <Text style={styles.sectionTitle}>Estatísticas dos Jogadores</Text>
     {estatisticas.length === 0 ? (
@@ -560,13 +765,20 @@ const EstatisticasJogadores = ({ estatisticas, styles }: EstatisticasJogadoresPr
           <Text style={styles.tableHeaderText}>%V</Text>
         </View>
         {estatisticas.map((jogador: EstatisticaJogador, index: number) => (
-          <View key={`jogador-${jogador.nome}-${index}`} style={[styles.tableRow, index % 2 === 0 && styles.tableRowEven]}>
+          <View
+            key={`jogador-${index}-${jogador.nome}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`}
+            style={[styles.tableRow, index % 2 === 0 && styles.tableRowEven]}
+          >
             <Text style={[styles.tableCell, { flex: 2 }]}>{jogador.nome}</Text>
             <Text style={styles.tableCell}>{jogador.jogos}</Text>
             <Text style={styles.tableCell}>{jogador.vitorias}</Text>
             <Text style={styles.tableCell}>{jogador.empates}</Text>
             <Text style={styles.tableCell}>{jogador.derrotas}</Text>
-            <Text style={styles.tableCell}>{jogador?.percentualVitorias?.toFixed(1) || '0.0'}%</Text>
+            <Text style={styles.tableCell}>
+              {jogador?.percentualVitorias?.toFixed(1) || "0.0"}%
+            </Text>
           </View>
         ))}
       </View>
@@ -574,7 +786,10 @@ const EstatisticasJogadores = ({ estatisticas, styles }: EstatisticasJogadoresPr
   </View>
 );
 
-const EstatisticasTimes = ({ estatisticas, styles }: EstatisticasTimesProps) => (
+const EstatisticasTimes = ({
+  estatisticas,
+  styles,
+}: EstatisticasTimesProps) => (
   <View style={styles.tabContent}>
     <Text style={styles.sectionTitle}>Relatórios de Desempenho por Time</Text>
     {estatisticas.length === 0 ? (
@@ -594,7 +809,12 @@ const EstatisticasTimes = ({ estatisticas, styles }: EstatisticasTimesProps) => 
           <Text style={styles.tableHeaderText}>Pts</Text>
         </View>
         {estatisticas.map((time: EstatisticaTime, index: number) => (
-          <View key={`time-${time.nome}-${index}`} style={[styles.tableRow, index % 2 === 0 && styles.tableRowEven]}>
+          <View
+            key={`time-${index}-${time.nome}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`}
+            style={[styles.tableRow, index % 2 === 0 && styles.tableRowEven]}
+          >
             <Text style={styles.tableCell}>{index + 1}º</Text>
             <Text style={[styles.tableCell, { flex: 2 }]}>{time.nome}</Text>
             <Text style={styles.tableCell}>{time.jogos}</Text>
@@ -616,18 +836,25 @@ const Exportacao = ({ onExport, styles }: ExportacaoProps) => (
   <View style={styles.tabContent}>
     <Text style={styles.sectionTitle}>Exportação de Dados</Text>
     <Text style={styles.exportDescription}>
-      Exporte um relatório completo com todas as estatísticas, classificações e histórico do campeonato em formato PDF.
+      Exporte um relatório completo com todas as estatísticas, classificações e
+      histórico do campeonato em formato PDF.
     </Text>
-    
+
     <TouchableOpacity style={styles.exportButton} onPress={onExport}>
       <Text style={styles.exportButtonText}>📄 Exportar Relatório PDF</Text>
     </TouchableOpacity>
-    
+
     <View style={styles.exportInfo}>
       <Text style={styles.exportInfoTitle}>O relatório incluirá:</Text>
-      <Text style={styles.exportInfoItem}>• Classificação completa dos times</Text>
-      <Text style={styles.exportInfoItem}>• Estatísticas detalhadas dos jogadores</Text>
-      <Text style={styles.exportInfoItem}>• Histórico de sorteios realizados</Text>
+      <Text style={styles.exportInfoItem}>
+        • Classificação completa dos times
+      </Text>
+      <Text style={styles.exportInfoItem}>
+        • Estatísticas detalhadas dos jogadores
+      </Text>
+      <Text style={styles.exportInfoItem}>
+        • Histórico de sorteios realizados
+      </Text>
       <Text style={styles.exportInfoItem}>• Data e hora de geração</Text>
     </View>
   </View>
@@ -636,11 +863,11 @@ const Exportacao = ({ onExport, styles }: ExportacaoProps) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || '#FFFFFF',
+    backgroundColor: theme?.colors?.background || "#FFFFFF",
   },
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: theme?.colors?.card || '#F5F5F5',
+    backgroundColor: theme?.colors?.card || "#F5F5F5",
     paddingHorizontal: theme?.spacing?.sm || 8,
     paddingTop: theme?.spacing?.sm || 8,
   },
