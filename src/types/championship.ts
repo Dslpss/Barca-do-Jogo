@@ -1,0 +1,63 @@
+// Tipos para o sistema de campeonatos
+
+export interface Player {
+  id: string;
+  name: string;
+  skill: number; // 1-5
+  position: string;
+  yellowCards: number;
+  redCards: number;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  color: string;
+  players: Player[];
+}
+
+export interface Match {
+  id: string;
+  homeTeam: string; // Team ID
+  awayTeam: string; // Team ID
+  homeScore?: number;
+  awayScore?: number;
+  date?: string;
+  played: boolean;
+  homeGoalScorers?: string[]; // Player IDs
+  awayGoalScorers?: string[]; // Player IDs
+}
+
+export interface Championship {
+  id: string;
+  name: string;
+  type: "pontos_corridos" | "mata_mata" | "grupos";
+  status: "criado" | "em_andamento" | "finalizado";
+  teams: Team[];
+  matches: Match[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChampionshipStats {
+  teamStats: {
+    [teamId: string]: {
+      matches: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      goalsFor: number;
+      goalsAgainst: number;
+      goalDifference: number;
+      points: number;
+    };
+  };
+  playerStats: {
+    [playerId: string]: {
+      matches: number;
+      goals: number;
+      yellowCards: number;
+      redCards: number;
+    };
+  };
+}
