@@ -14,7 +14,15 @@ import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
-import { Match, Team, GoalScorer } from "../types/championship";
+import { ChampionshipService } from "../services/championshipService";
+import {
+  Match,
+  Team,
+  GoalScorer,
+  MatchGenerationOptions,
+  ManualMatch,
+  Championship,
+} from "../types/championship";
 
 const ChampionshipMatchesScreen = () => {
   const isFocused = useIsFocused();
@@ -23,6 +31,9 @@ const ChampionshipMatchesScreen = () => {
     generateMatches,
     recordMatchResult,
     loadCurrentChampionship,
+    forceReloadCurrentChampionship,
+    getPossibleMatchups,
+    getMatchesByRound,
   } = useChampionship();
 
   const [matchScores, setMatchScores] = useState<{
@@ -42,16 +53,31 @@ const ChampionshipMatchesScreen = () => {
     playerName: string;
   } | null>(null);
 
+  // Novos estados para as funcionalidades avançadas
+  const [showMatchGenerationModal, setShowMatchGenerationModal] =
+    useState(false);
+  const [selectedManualMatches, setSelectedManualMatches] = useState<
+    ManualMatch[]
+  >([]);
+  const [showManualMatchSelection, setShowManualMatchSelection] =
+    useState(false);
+  const [customMatchForm, setCustomMatchForm] = useState({
+    homeTeam: "",
+    awayTeam: "",
+  });
+
   useEffect(() => {
     if (isFocused) {
-      loadCurrentChampionship();
+      console.log("🔄 Tela ganhou foco, forçando recarregamento...");
+      // Usar a função específica para forçar recarregamento
+      forceReloadCurrentChampionship();
     }
   }, [isFocused]);
 
   const handleGenerateMatches = async () => {
     if (!currentChampionship) return;
 
-    if (currentChampionship.teams.length < 2) {
+    if ((currentChampionship.teams?.length || 0) < 2) {
       Alert.alert(
         "Erro",
         "É necessário pelo menos 2 times para gerar partidas"
@@ -59,27 +85,95 @@ const ChampionshipMatchesScreen = () => {
       return;
     }
 
-    Alert.alert(
-      "Gerar Partidas",
-      "Isso irá substituir as partidas existentes. Continuar?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Gerar",
-          onPress: async () => {
-            try {
-              await generateMatches();
-              Alert.alert("Sucesso", "Partidas geradas com sucesso!");
-            } catch (error) {
-              Alert.alert("Erro", "Erro ao gerar partidas");
-            }
-          },
-        },
-      ]
+    // Abrir modal de configuração ao invés de gerar diretamente
+    setShowMatchGenerationModal(true);
+  };
+
+  const handleConfirmGeneration = async () => {
+    if (!currentChampionship) return;
+
+    if (selectedManualMatches.length === 0) {
+      Alert.alert("Erro", "Selecione pelo menos uma partida para gerar");
+      return;
+    }
+
+    try {
+      const options: MatchGenerationOptions = {
+        type: "manual",
+        manualMatches: selectedManualMatches,
+      };
+
+      await generateMatches(options);
+      setShowMatchGenerationModal(false);
+      setSelectedManualMatches([]);
+      Alert.alert("Sucesso", "Partidas geradas com sucesso!");
+    } catch (error) {
+      Alert.alert("Erro", "Erro ao gerar partidas");
+    }
+  };
+
+  const handleAddManualMatch = (homeTeamId: string, awayTeamId: string) => {
+    const newMatch: ManualMatch = {
+      homeTeamId,
+      awayTeamId,
+      round: 1, // Pode ser configurável no futuro
+    };
+
+    setSelectedManualMatches((prev) => [...prev, newMatch]);
+  };
+
+  const handleRemoveManualMatch = (index: number) => {
+    setSelectedManualMatches((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddCustomMatch = () => {
+    if (!customMatchForm.homeTeam || !customMatchForm.awayTeam) {
+      Alert.alert("Erro", "Selecione ambos os times");
+      return;
+    }
+
+    if (customMatchForm.homeTeam === customMatchForm.awayTeam) {
+      Alert.alert("Erro", "Um time não pode jogar contra ele mesmo");
+      return;
+    }
+
+    // Verificar se o confronto já existe
+    const matchExists = selectedManualMatches.some(
+      (match) =>
+        (match.homeTeamId === customMatchForm.homeTeam &&
+          match.awayTeamId === customMatchForm.awayTeam) ||
+        (match.homeTeamId === customMatchForm.awayTeam &&
+          match.awayTeamId === customMatchForm.homeTeam)
     );
+
+    if (matchExists) {
+      Alert.alert("Erro", "Este confronto já foi adicionado");
+      return;
+    }
+
+    const newMatch: ManualMatch = {
+      homeTeamId: customMatchForm.homeTeam,
+      awayTeamId: customMatchForm.awayTeam,
+      round: 1,
+    };
+
+    setSelectedManualMatches((prev) => [...prev, newMatch]);
+    setCustomMatchForm({ homeTeam: "", awayTeam: "" });
+  };
+
+  const getPossibleMatchupsForUI = () => {
+    if (!currentChampionship?.teams) return [];
+    return getPossibleMatchups();
+  };
+
+  const getMatchesByRoundForUI = () => {
+    if (!currentChampionship) return {};
+    return getMatchesByRound();
   };
 
   const handleRecordResult = async (match: Match) => {
+    console.log("🎯 Iniciando registro de resultado:", match.id);
+
     const scoreData = matchScores[match.id];
     if (!scoreData || !scoreData.home || !scoreData.away) {
       Alert.alert("Erro", "Digite os placares da partida");
@@ -88,6 +182,8 @@ const ChampionshipMatchesScreen = () => {
 
     const homeScore = parseInt(scoreData.home);
     const awayScore = parseInt(scoreData.away);
+
+    console.log("📊 Placares:", { homeScore, awayScore });
 
     if (
       isNaN(homeScore) ||
@@ -100,6 +196,7 @@ const ChampionshipMatchesScreen = () => {
     }
 
     try {
+      console.log("🚀 Chamando recordMatchResult...");
       await recordMatchResult(
         match.id,
         homeScore,
@@ -107,8 +204,18 @@ const ChampionshipMatchesScreen = () => {
         scoreData.homeGoalScorers,
         scoreData.awayGoalScorers
       );
+      console.log("✅ recordMatchResult concluído, atualizando UI...");
+
+      // Limpar os campos de placar após registrar o resultado
+      setMatchScores((prev) => {
+        const updated = { ...prev };
+        delete updated[match.id];
+        return updated;
+      });
+
       Alert.alert("Sucesso", "Resultado registrado com sucesso!");
     } catch (error) {
+      console.error("❌ Erro ao registrar resultado:", error);
       Alert.alert("Erro", "Erro ao registrar resultado");
     }
   };
@@ -292,7 +399,7 @@ const ChampionshipMatchesScreen = () => {
                   ? `${player.name} (${scorer.goals}⚽${
                       scorer.yellowCard ? " 🟨" : ""
                     }${scorer.redCard ? " 🟥" : ""})`
-                  : "";
+                  : null;
               })
               .filter(Boolean)
               .join(", ")}
@@ -369,7 +476,7 @@ const ChampionshipMatchesScreen = () => {
                           ? `${player.name} (${scorer.goals}⚽${
                               scorer.yellowCard ? " 🟨" : ""
                             }${scorer.redCard ? " 🟥" : ""})`
-                          : "";
+                          : null;
                       })
                       .filter(Boolean)
                       .join(", ")}
@@ -387,7 +494,7 @@ const ChampionshipMatchesScreen = () => {
                           ? `${player.name} (${scorer.goals}⚽${
                               scorer.yellowCard ? " 🟨" : ""
                             }${scorer.redCard ? " 🟥" : ""})`
-                          : "";
+                          : null;
                       })
                       .filter(Boolean)
                       .join(", ")}
@@ -437,6 +544,39 @@ const ChampionshipMatchesScreen = () => {
     );
   };
 
+  const renderMatchesByRounds = () => {
+    const matchesByRound = getMatchesByRoundForUI();
+    const rounds = Object.keys(matchesByRound).sort(
+      (a, b) => parseInt(a) - parseInt(b)
+    );
+
+    if (rounds.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>Nenhuma partida encontrada</Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContainer}
+      >
+        {rounds.map((round) => (
+          <View key={round} style={styles.roundContainer}>
+            <Text style={styles.roundTitle}>🏁 Rodada {round}</Text>
+            {matchesByRound[parseInt(round)].map((match) => (
+              <View key={match.id} style={styles.matchInRound}>
+                {renderMatchItem({ item: match })}
+              </View>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+    );
+  };
+
   if (!currentChampionship) {
     return (
       <View style={styles.container}>
@@ -458,10 +598,9 @@ const ChampionshipMatchesScreen = () => {
     );
   }
 
-  const playedMatches = currentChampionship.matches.filter(
-    (m) => m.played
-  ).length;
-  const totalMatches = currentChampionship.matches.length;
+  const playedMatches =
+    currentChampionship?.matches?.filter((m) => m.played).length || 0;
+  const totalMatches = currentChampionship?.matches?.length || 0;
 
   return (
     <View style={styles.container}>
@@ -477,14 +616,14 @@ const ChampionshipMatchesScreen = () => {
           </Text>
         </View>
 
-        {currentChampionship.teams.length < 2 ? (
+        {(currentChampionship.teams?.length || 0) < 2 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Adicione pelo menos 2 times</Text>
             <Text style={styles.emptySubtext}>
               É necessário ter pelo menos 2 times para gerar partidas
             </Text>
           </View>
-        ) : currentChampionship.matches.length === 0 ? (
+        ) : (currentChampionship?.matches?.length || 0) === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Nenhuma partida gerada</Text>
             <Text style={styles.emptySubtext}>
@@ -509,13 +648,7 @@ const ChampionshipMatchesScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <FlatList
-              data={currentChampionship.matches}
-              renderItem={renderMatchItem}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.listContainer}
-            />
+            {renderMatchesByRounds()}
           </>
         )}
       </View>
@@ -526,6 +659,24 @@ const ChampionshipMatchesScreen = () => {
         playerName={playerDetailsModal?.playerName || ""}
         onClose={() => setPlayerDetailsModal(null)}
         onSave={addPlayerDetails}
+      />
+
+      {/* Modal de Configuração de Geração de Partidas */}
+      <MatchGenerationModal
+        visible={showMatchGenerationModal}
+        selectedManualMatches={selectedManualMatches}
+        possibleMatchups={getPossibleMatchupsForUI()}
+        onAddManualMatch={handleAddManualMatch}
+        onRemoveManualMatch={handleRemoveManualMatch}
+        onAddCustomMatch={handleAddCustomMatch}
+        customMatchForm={customMatchForm}
+        onCustomMatchFormChange={setCustomMatchForm}
+        teams={currentChampionship?.teams || []}
+        onConfirm={handleConfirmGeneration}
+        onClose={() => {
+          setShowMatchGenerationModal(false);
+          setSelectedManualMatches([]);
+        }}
       />
     </View>
   );
@@ -616,6 +767,243 @@ const PlayerDetailsModal = ({
               onPress={handleSave}
             >
               <Text style={modalStyles.saveButtonText}>Confirmar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// Componente Modal para configuração de geração de partidas
+const MatchGenerationModal = ({
+  visible,
+  selectedManualMatches,
+  possibleMatchups,
+  onAddManualMatch,
+  onRemoveManualMatch,
+  onAddCustomMatch,
+  customMatchForm,
+  onCustomMatchFormChange,
+  teams,
+  onConfirm,
+  onClose,
+}: {
+  visible: boolean;
+  selectedManualMatches: ManualMatch[];
+  possibleMatchups: { homeTeam: Team; awayTeam: Team }[];
+  onAddManualMatch: (homeTeamId: string, awayTeamId: string) => void;
+  onRemoveManualMatch: (index: number) => void;
+  onAddCustomMatch: () => void;
+  customMatchForm: { homeTeam: string; awayTeam: string };
+  onCustomMatchFormChange: (form: {
+    homeTeam: string;
+    awayTeam: string;
+  }) => void;
+  teams: Team[];
+  onConfirm: () => void;
+  onClose: () => void;
+}) => {
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={modalStyles.overlay}>
+        <View style={[modalStyles.container, { maxHeight: "80%" }]}>
+          <Text style={modalStyles.title}>⚽ Seleção Manual de Partidas</Text>
+
+          {/* Seção para criar confrontos personalizados */}
+          <View style={modalStyles.section}>
+            <Text style={modalStyles.label}>
+              🎯 Criar Confronto Personalizado:
+            </Text>
+
+            <View style={modalStyles.teamSelectionRow}>
+              <View style={modalStyles.teamSelector}>
+                <Text style={modalStyles.teamSelectorLabel}>Time da Casa:</Text>
+                <TouchableOpacity
+                  style={[
+                    modalStyles.teamSelectorButton,
+                    !customMatchForm.homeTeam &&
+                      modalStyles.teamSelectorButtonEmpty,
+                  ]}
+                  onPress={() => {
+                    Alert.alert(
+                      "Selecionar Time da Casa",
+                      "Escolha o time da casa:",
+                      teams
+                        .map((team) => ({
+                          text: team.name,
+                          onPress: () =>
+                            onCustomMatchFormChange({
+                              ...customMatchForm,
+                              homeTeam: team.id,
+                            }),
+                        }))
+                        .concat([{ text: "Cancelar", onPress: () => {} }])
+                    );
+                  }}
+                >
+                  <Text
+                    style={[
+                      modalStyles.teamSelectorText,
+                      !customMatchForm.homeTeam &&
+                        modalStyles.teamSelectorTextEmpty,
+                    ]}
+                  >
+                    {customMatchForm.homeTeam
+                      ? teams.find((t) => t.id === customMatchForm.homeTeam)
+                          ?.name
+                      : "Selecionar"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={modalStyles.vsText}>VS</Text>
+
+              <View style={modalStyles.teamSelector}>
+                <Text style={modalStyles.teamSelectorLabel}>
+                  Time Visitante:
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    modalStyles.teamSelectorButton,
+                    !customMatchForm.awayTeam &&
+                      modalStyles.teamSelectorButtonEmpty,
+                  ]}
+                  onPress={() => {
+                    Alert.alert(
+                      "Selecionar Time Visitante",
+                      "Escolha o time visitante:",
+                      teams
+                        .map((team) => ({
+                          text: team.name,
+                          onPress: () =>
+                            onCustomMatchFormChange({
+                              ...customMatchForm,
+                              awayTeam: team.id,
+                            }),
+                        }))
+                        .concat([{ text: "Cancelar", onPress: () => {} }])
+                    );
+                  }}
+                >
+                  <Text
+                    style={[
+                      modalStyles.teamSelectorText,
+                      !customMatchForm.awayTeam &&
+                        modalStyles.teamSelectorTextEmpty,
+                    ]}
+                  >
+                    {customMatchForm.awayTeam
+                      ? teams.find((t) => t.id === customMatchForm.awayTeam)
+                          ?.name
+                      : "Selecionar"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={modalStyles.addCustomMatchButton}
+              onPress={onAddCustomMatch}
+            >
+              <Text style={modalStyles.addCustomMatchButtonText}>
+                + Adicionar Confronto
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={modalStyles.label}>
+            Confrontos Selecionados ({selectedManualMatches.length}):
+          </Text>
+
+          {selectedManualMatches.length > 0 && (
+            <ScrollView style={modalStyles.selectedMatchesList}>
+              {selectedManualMatches.map((match, index) => {
+                const homeTeam = possibleMatchups.find(
+                  (m) => m.homeTeam.id === match.homeTeamId
+                )?.homeTeam;
+                const awayTeam = possibleMatchups.find(
+                  (m) => m.awayTeam.id === match.awayTeamId
+                )?.awayTeam;
+
+                return (
+                  <View key={index} style={modalStyles.selectedMatchItem}>
+                    <Text style={modalStyles.selectedMatchText}>
+                      {homeTeam?.name} vs {awayTeam?.name}
+                    </Text>
+                    <TouchableOpacity
+                      style={modalStyles.removeMatchButton}
+                      onPress={() => onRemoveManualMatch(index)}
+                    >
+                      <Text style={modalStyles.removeMatchButtonText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {/* Seção opcional para confrontos pré-definidos */}
+          <Text style={modalStyles.label}>
+            📋 Ou escolha confrontos pré-definidos:
+          </Text>
+          <ScrollView style={modalStyles.availableMatchesList}>
+            {possibleMatchups.map((matchup, index) => {
+              const isAlreadySelected = selectedManualMatches.some(
+                (m) =>
+                  (m.homeTeamId === matchup.homeTeam.id &&
+                    m.awayTeamId === matchup.awayTeam.id) ||
+                  (m.homeTeamId === matchup.awayTeam.id &&
+                    m.awayTeamId === matchup.homeTeam.id)
+              );
+
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    modalStyles.availableMatchItem,
+                    isAlreadySelected && modalStyles.availableMatchItemDisabled,
+                  ]}
+                  onPress={() => {
+                    if (!isAlreadySelected) {
+                      onAddManualMatch(
+                        matchup.homeTeam.id,
+                        matchup.awayTeam.id
+                      );
+                    }
+                  }}
+                  disabled={isAlreadySelected}
+                >
+                  <Text
+                    style={[
+                      modalStyles.availableMatchText,
+                      isAlreadySelected &&
+                        modalStyles.availableMatchTextDisabled,
+                    ]}
+                  >
+                    {matchup.homeTeam.name} vs {matchup.awayTeam.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Botões de Ação */}
+          <View style={modalStyles.buttonRow}>
+            <TouchableOpacity
+              style={modalStyles.cancelButton}
+              onPress={onClose}
+            >
+              <Text style={modalStyles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={modalStyles.saveButton}
+              onPress={onConfirm}
+            >
+              <Text style={modalStyles.saveButtonText}>
+                Gerar ({selectedManualMatches.length} partidas)
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -858,6 +1246,20 @@ const styles = StyleSheet.create({
     ...theme.typography.button,
     color: theme.colors.white,
   },
+  // Estilos para visualização por rodadas
+  roundContainer: {
+    marginBottom: theme.spacing.lg,
+  },
+  roundTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
+    fontWeight: "bold",
+  },
+  matchInRound: {
+    marginBottom: theme.spacing.sm,
+  },
 });
 
 const modalStyles = StyleSheet.create({
@@ -948,6 +1350,195 @@ const modalStyles = StyleSheet.create({
   saveButtonText: {
     ...theme.typography.button,
     color: theme.colors.white,
+  },
+  // Novos estilos para o modal de geração de partidas
+  container: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.spacing.md,
+    padding: theme.spacing.lg,
+    margin: theme.spacing.md,
+    maxWidth: "90%",
+    width: "100%",
+  },
+  typeRow: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  typeButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.md,
+    alignItems: "center",
+    backgroundColor: theme.colors.background,
+  },
+  typeButtonSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  typeButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    fontWeight: "600",
+  },
+  typeButtonTextSelected: {
+    color: theme.colors.white,
+  },
+  sliderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+  },
+  sliderButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sliderButtonText: {
+    color: theme.colors.white,
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  sliderValue: {
+    minWidth: 60,
+    height: 40,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.card,
+  },
+  sliderValueText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    fontWeight: "600",
+    fontSize: 18,
+  },
+  sublabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  selectedMatchesList: {
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+    marginVertical: theme.spacing.sm,
+  },
+  selectedMatchItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  selectedMatchText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    flex: 1,
+  },
+  removeMatchButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.error,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removeMatchButtonText: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  availableMatchesList: {
+    maxHeight: 150,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+  },
+  availableMatchItem: {
+    padding: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
+  },
+  availableMatchItemDisabled: {
+    backgroundColor: theme.colors.border,
+    opacity: 0.5,
+  },
+  availableMatchText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+  },
+  availableMatchTextDisabled: {
+    color: theme.colors.textSecondary,
+  },
+  // Novos estilos para criação de confrontos personalizados
+  teamSelectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+    marginVertical: theme.spacing.sm,
+  },
+  teamSelector: {
+    flex: 1,
+  },
+  teamSelectorLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+  },
+  teamSelectorButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.card,
+    alignItems: "center",
+  },
+  teamSelectorButtonEmpty: {
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  teamSelectorText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+  },
+  teamSelectorTextEmpty: {
+    color: theme.colors.textSecondary,
+    fontStyle: "italic",
+  },
+  vsText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    fontWeight: "bold",
+    textAlign: "center",
+    paddingTop: theme.spacing.md,
+  },
+  addCustomMatchButton: {
+    backgroundColor: theme.colors.secondary,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.md,
+    alignItems: "center",
+    marginTop: theme.spacing.sm,
+  },
+  addCustomMatchButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontWeight: "600",
   },
 });
 

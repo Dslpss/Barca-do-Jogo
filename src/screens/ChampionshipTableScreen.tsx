@@ -26,6 +26,7 @@ const ChampionshipTableScreen = () => {
 
   useEffect(() => {
     if (isFocused) {
+      console.log("🔄 TABLE: Tela focada, recarregando campeonato...");
       loadCurrentChampionship();
     }
   }, [isFocused]);
@@ -51,13 +52,22 @@ const ChampionshipTableScreen = () => {
     );
   }
 
+  console.log("📊 TABLE: Calculando estatísticas...");
   const stats = calculateStats();
-  const playedMatches = currentChampionship.matches.filter(
-    (m) => m.played
-  ).length;
+  const playedMatches =
+    currentChampionship?.matches?.filter((m) => m.played).length || 0;
+
+  console.log("🎮 TABLE: Campeonato atual:", {
+    name: currentChampionship.name,
+    totalMatches: currentChampionship?.matches?.length || 0,
+    playedMatches: playedMatches,
+    teams: currentChampionship?.teams?.length || 0,
+  });
+
+  console.log("📋 TABLE: Estatísticas recebidas:", stats);
 
   // Criar tabela de classificação
-  const tableData: TableRow[] = currentChampionship.teams
+  const tableData: TableRow[] = (currentChampionship?.teams || [])
     .map((team, index) => {
       const teamStats = stats.teamStats[team.id] || {
         matches: 0,
@@ -169,8 +179,8 @@ const ChampionshipTableScreen = () => {
       goals: number;
     }[] = [];
 
-    currentChampionship.teams.forEach((team) => {
-      team.players.forEach((player) => {
+    (currentChampionship?.teams || []).forEach((team) => {
+      (team.players || []).forEach((player) => {
         const playerStats = stats.playerStats[player.id];
         if (playerStats && playerStats.goals > 0) {
           playerGoals.push({
@@ -217,12 +227,12 @@ const ChampionshipTableScreen = () => {
             {currentChampionship.name}
           </Text>
           <Text style={styles.matchesInfo}>
-            {playedMatches} de {currentChampionship.matches.length} partidas
-            realizadas
+            {playedMatches} de {currentChampionship?.matches?.length || 0}{" "}
+            partidas realizadas
           </Text>
         </View>
 
-        {currentChampionship.teams.length === 0 ? (
+        {(currentChampionship?.teams || []).length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Nenhum time cadastrado</Text>
             <Text style={styles.emptySubtext}>

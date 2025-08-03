@@ -26,6 +26,10 @@ const ChampionshipManagerScreen = () => {
     createChampionship,
     selectChampionship,
     loadChampionships,
+    pauseChampionship,
+    resumeChampionship,
+    finishChampionship,
+    deleteChampionship,
   } = useChampionship();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -65,6 +69,81 @@ const ChampionshipManagerScreen = () => {
     }
   };
 
+  const handlePauseChampionship = async (championshipId: string) => {
+    Alert.alert(
+      "Pausar Campeonato",
+      "Tem certeza que deseja pausar este campeonato?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Pausar",
+          style: "default",
+          onPress: async () => {
+            try {
+              await pauseChampionship(championshipId);
+              Alert.alert("Sucesso", "Campeonato pausado com sucesso!");
+            } catch (error) {
+              Alert.alert("Erro", "Erro ao pausar campeonato");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResumeChampionship = async (championshipId: string) => {
+    try {
+      await resumeChampionship(championshipId);
+      Alert.alert("Sucesso", "Campeonato retomado com sucesso!");
+    } catch (error) {
+      Alert.alert("Erro", "Erro ao retomar campeonato");
+    }
+  };
+
+  const handleFinishChampionship = async (championshipId: string) => {
+    Alert.alert(
+      "Finalizar Campeonato",
+      "Tem certeza que deseja finalizar este campeonato? Esta ação não pode ser desfeita.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Finalizar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await finishChampionship(championshipId);
+              Alert.alert("Sucesso", "Campeonato finalizado com sucesso!");
+            } catch (error) {
+              Alert.alert("Erro", "Erro ao finalizar campeonato");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteChampionship = async (championshipId: string) => {
+    Alert.alert(
+      "Deletar Campeonato",
+      "Tem certeza que deseja deletar este campeonato? Esta ação não pode ser desfeita e todos os dados serão perdidos.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Deletar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteChampionship(championshipId);
+              Alert.alert("Sucesso", "Campeonato deletado com sucesso!");
+            } catch (error) {
+              Alert.alert("Erro", "Erro ao deletar campeonato");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getTypeLabel = (type: string) => {
     switch (type) {
       case "pontos_corridos":
@@ -83,7 +162,9 @@ const ChampionshipManagerScreen = () => {
       case "criado":
         return "Criado";
       case "em_andamento":
-        return "Em andamento";
+        return "Em Andamento";
+      case "pausado":
+        return "Pausado";
       case "finalizado":
         return "Finalizado";
       default:
@@ -94,11 +175,13 @@ const ChampionshipManagerScreen = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "criado":
-        return theme.colors.secondary;
+        return "#2196F3"; // Azul
       case "em_andamento":
-        return theme.colors.primary;
+        return "#4CAF50"; // Verde
+      case "pausado":
+        return "#FF9800"; // Laranja
       case "finalizado":
-        return theme.colors.success;
+        return "#9E9E9E"; // Cinza
       default:
         return theme.colors.textSecondary;
     }
@@ -131,16 +214,27 @@ const ChampionshipManagerScreen = () => {
         </Text>
         <Text style={styles.infoText}>
           <Text style={styles.infoLabel}>Times: </Text>
-          {item.teams.length}
+          {item.teams?.length || 0}
         </Text>
         <Text style={styles.infoText}>
           <Text style={styles.infoLabel}>Jogos: </Text>
-          {item.matches.length}
+          {item.matches?.length || 0}
         </Text>
       </View>
 
       <Text style={styles.dateText}>
-        Criado em: {new Date(item.createdAt).toLocaleDateString("pt-BR")}
+        Criado em:{" "}
+        {(() => {
+          try {
+            const date = new Date(item.createdAt);
+            if (isNaN(date.getTime())) {
+              return "Data inválida";
+            }
+            return date.toLocaleDateString("pt-BR");
+          } catch (error) {
+            return "Data inválida";
+          }
+        })()}
       </Text>
 
       {currentChampionship?.id === item.id && (
@@ -148,6 +242,43 @@ const ChampionshipManagerScreen = () => {
           <Text style={styles.selectedText}>✓ Selecionado</Text>
         </View>
       )}
+
+      {/* Botões de ação */}
+      <View style={styles.actionButtons}>
+        {item.status === "pausado" && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.resumeButton]}
+            onPress={() => handleResumeChampionship(item.id)}
+          >
+            <Text style={styles.actionButtonText}>▶️ Retomar</Text>
+          </TouchableOpacity>
+        )}
+
+        {(item.status === "criado" || item.status === "em_andamento") && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.pauseButton]}
+            onPress={() => handlePauseChampionship(item.id)}
+          >
+            <Text style={styles.actionButtonText}>⏸️ Pausar</Text>
+          </TouchableOpacity>
+        )}
+
+        {item.status !== "finalizado" && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.finishButton]}
+            onPress={() => handleFinishChampionship(item.id)}
+          >
+            <Text style={styles.actionButtonText}>🏁 Finalizar</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleDeleteChampionship(item.id)}
+        >
+          <Text style={styles.actionButtonText}>🗑️ Deletar</Text>
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -490,6 +621,40 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     ...theme.typography.button,
     color: theme.colors.white,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  actionButton: {
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.spacing.sm,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  actionButtonText: {
+    ...theme.typography.caption,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "white",
+  },
+  resumeButton: {
+    backgroundColor: "#4CAF50",
+  },
+  pauseButton: {
+    backgroundColor: "#FF9800",
+  },
+  finishButton: {
+    backgroundColor: "#9E9E9E",
+  },
+  deleteButton: {
+    backgroundColor: "#F44336",
   },
 });
 

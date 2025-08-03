@@ -16,6 +16,7 @@ import AppHeader from "../components/AppHeader";
 import SyncStatus from "../components/SyncStatus";
 import { useAuth } from "../contexts/AuthContext";
 import { useData } from "../hooks/useData";
+import { useChampionship } from "../hooks/useChampionship";
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
@@ -30,7 +31,32 @@ export default function HomeScreen() {
     loadAllData,
     syncData,
   } = useData();
+  const { championships, syncData: syncChampionships } = useChampionship();
   const [lastSync, setLastSync] = useState<Date | undefined>();
+
+  // Calcular estatísticas dos campeonatos
+  const championshipStats = {
+    totalChampionships: championships?.length || 0,
+    activeChampionships:
+      championships?.filter((c) => c && c.status === "em_andamento").length ||
+      0,
+    totalPlayers:
+      championships?.reduce((total, championship) => {
+        if (!championship || !championship.teams) return total;
+        return (
+          total +
+          championship.teams.reduce((teamTotal, team) => {
+            if (!team || !team.players) return teamTotal;
+            return teamTotal + team.players.length;
+          }, 0)
+        );
+      }, 0) || 0,
+    totalMatches:
+      championships?.reduce((total, championship) => {
+        if (!championship || !championship.matches) return total;
+        return total + championship.matches.length;
+      }, 0) || 0,
+  };
 
   useEffect(() => {
     if (isFocused && user) {
@@ -40,7 +66,7 @@ export default function HomeScreen() {
 
   const handleSync = async () => {
     try {
-      await syncData();
+      await Promise.all([syncData(), syncChampionships()]);
       setLastSync(new Date());
     } catch (error) {
       console.error("Erro na sincronização manual:", error);
@@ -116,30 +142,36 @@ export default function HomeScreen() {
         >
           <View style={styles.infoRow}>
             <View style={styles.infoBox}>
-              <Ionicons name="people-outline" size={18} color="#fff" />
-              <Text style={styles.infoText}>
-                {isLoading ? "..." : players.length}
-              </Text>
-              <Text style={styles.infoLabel}>Players</Text>
-            </View>
-            <View style={styles.infoBox}>
-              <Ionicons name="shirt-outline" size={18} color="#fff" />
-              <Text style={styles.infoText}>
-                {isLoading ? "..." : teams.length}
-              </Text>
-              <Text style={styles.infoLabel}>Times</Text>
-            </View>
-            <View style={styles.infoBox}>
               <Ionicons name="trophy-outline" size={18} color="#fff" />
               <Text style={styles.infoText}>
-                {isLoading ? "..." : gameResults.length}
+                {isLoading ? "..." : championshipStats.totalChampionships}
               </Text>
-              <Text style={styles.infoLabel}>Jogos</Text>
+              <Text style={styles.infoLabel}>Campeonatos</Text>
+              <Text style={styles.infoDescription}>Criados</Text>
             </View>
             <View style={styles.infoBox}>
-              <Ionicons name="cloud-outline" size={18} color="#fff" />
-              <Text style={styles.infoText}>{user ? "On" : "Off"}</Text>
-              <Text style={styles.infoLabel}>Status</Text>
+              <Ionicons name="play-outline" size={18} color="#fff" />
+              <Text style={styles.infoText}>
+                {isLoading ? "..." : championshipStats.activeChampionships}
+              </Text>
+              <Text style={styles.infoLabel}>Em Andamento</Text>
+              <Text style={styles.infoDescription}>Acontecendo</Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Ionicons name="people-outline" size={18} color="#fff" />
+              <Text style={styles.infoText}>
+                {isLoading ? "..." : championshipStats.totalPlayers}
+              </Text>
+              <Text style={styles.infoLabel}>Jogadores</Text>
+              <Text style={styles.infoDescription}>Inscritos</Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Ionicons name="football-outline" size={18} color="#fff" />
+              <Text style={styles.infoText}>
+                {isLoading ? "..." : championshipStats.totalMatches}
+              </Text>
+              <Text style={styles.infoLabel}>Partidas</Text>
+              <Text style={styles.infoDescription}>Programadas</Text>
             </View>
           </View>
 
@@ -196,72 +228,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {/* Divisor visual */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>Sistema Clássico</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.navigate("Players")}
-          >
-            <Ionicons
-              name="people-outline"
-              size={24}
-              color="#1e3c72"
-              style={{ marginRight: 12 }}
-            />
-            <Text style={styles.menuButtonText}>Cadastrar Jogadores</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.navigate("Teams")}
-          >
-            <Ionicons
-              name="shirt-outline"
-              size={24}
-              color="#1e3c72"
-              style={{ marginRight: 12 }}
-            />
-            <Text style={styles.menuButtonText}>Cadastrar Times</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.navigate("AssignPlayers")}
-          >
-            <Ionicons
-              name="shuffle-outline"
-              size={24}
-              color="#1e3c72"
-              style={{ marginRight: 12 }}
-            />
-            <Text style={styles.menuButtonText}>Distribuir Jogadores</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.navigate("MatchSchedule")}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={24}
-              color="#1e3c72"
-              style={{ marginRight: 12 }}
-            />
-            <Text style={styles.menuButtonText}>Ver Jogos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.navigate("HistoryReports")}
-          >
-            <Ionicons
-              name="stats-chart-outline"
-              size={24}
-              color="#1e3c72"
-              style={{ marginRight: 12 }}
-            />
-            <Text style={styles.menuButtonText}>Histórico & Relatórios</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </LinearGradient>
@@ -332,6 +298,17 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
     opacity: 0.9,
+  },
+  infoDescription: {
+    marginTop: 1,
+    color: "rgba(255, 255, 255, 0.7)",
+    fontWeight: "400",
+    fontSize: 8,
+    textAlign: "center",
+    textShadowColor: "#1e3c72",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    opacity: 0.8,
   },
   menuContainer: {
     width: "100%",

@@ -34,17 +34,33 @@ export interface Match {
   played: boolean;
   homeGoalScorers?: GoalScorer[]; // Detailed goal and card info
   awayGoalScorers?: GoalScorer[]; // Detailed goal and card info
+  round?: number; // Rodada/Dia do jogo
+  matchOrder?: number; // Ordem do jogo na rodada
+}
+
+export interface MatchGenerationOptions {
+  type: "manual";
+  manualMatches: ManualMatch[]; // Confrontos selecionados manualmente (obrigatório)
+}
+
+export interface ManualMatch {
+  homeTeamId: string;
+  awayTeamId: string;
+  round?: number;
 }
 
 export interface Championship {
   id: string;
   name: string;
   type: "pontos_corridos" | "mata_mata" | "grupos";
-  status: "criado" | "em_andamento" | "finalizado";
+  status: "criado" | "em_andamento" | "pausado" | "finalizado";
   teams: Team[];
   matches: Match[];
+  matchGenerationOptions?: MatchGenerationOptions; // Opções de geração de partidas
   createdAt: string;
   updatedAt: string;
+  finishedAt?: string; // Data de finalização do campeonato
+  userId?: string; // ID do usuário proprietário do campeonato
 }
 
 export interface ChampionshipStats {

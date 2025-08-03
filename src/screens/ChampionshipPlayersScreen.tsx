@@ -85,8 +85,9 @@ const ChampionshipPlayersScreen = () => {
       return;
     }
 
-    // Validar CPF se fornecido
-    if (playerCpf.trim() && !validateCPF(playerCpf.replace(/\D/g, ""))) {
+    // Validar CPF se fornecido (e não vazio)
+    const cpfValue = playerCpf.trim();
+    if (cpfValue && !validateCPF(cpfValue.replace(/\D/g, ""))) {
       Alert.alert("Erro", "CPF inválido. Verifique os números digitados.");
       return;
     }
@@ -98,7 +99,7 @@ const ChampionshipPlayersScreen = () => {
         position: playerPosition,
         yellowCards: 0,
         redCards: 0,
-        cpf: playerCpf.trim() || undefined, // Salva CPF formatado se fornecido
+        ...(cpfValue && { cpf: cpfValue }), // Só incluir CPF se fornecido e não vazio
       };
 
       await addPlayerToTeam(selectedTeamId, newPlayer);

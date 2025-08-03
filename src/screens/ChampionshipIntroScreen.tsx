@@ -5,14 +5,48 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
+import { useChampionship } from "../hooks/useChampionship";
 
 const ChampionshipIntroScreen = () => {
   const navigation = useNavigation<any>();
+  const { clearAllData, loading } = useChampionship();
+
+  const handleClearAllData = () => {
+    Alert.alert(
+      "⚠️ Limpar Todos os Dados",
+      "Esta ação irá deletar permanentemente todos os seus campeonatos, times, jogadores e partidas. Esta ação não pode ser desfeita.\n\nTem certeza que deseja continuar?",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Sim, Limpar Tudo",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await clearAllData();
+              Alert.alert(
+                "✅ Dados Limpos",
+                "Todos os seus dados foram removidos com sucesso!"
+              );
+            } catch (error) {
+              Alert.alert(
+                "❌ Erro",
+                "Ocorreu um erro ao limpar os dados. Tente novamente."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const steps = [
     {
@@ -111,20 +145,30 @@ const ChampionshipIntroScreen = () => {
           </View>
         </View>
 
-        <View style={styles.compatibilityCard}>
-          <Text style={styles.compatibilityTitle}>🔄 Sistema Clássico</Text>
-          <Text style={styles.compatibilityText}>
-            O sistema antigo continua disponível na tela inicial para jogos
-            avulsos e sorteios rápidos.
-          </Text>
-        </View>
-
         <TouchableOpacity
           style={styles.startButton}
           onPress={() => navigation.navigate("ChampionshipManager")}
         >
           <Text style={styles.startButtonText}>Começar Agora</Text>
         </TouchableOpacity>
+
+        {/* Botão de Limpar Dados */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🗑️ Gerenciar Dados</Text>
+          <TouchableOpacity
+            style={styles.clearDataButton}
+            onPress={handleClearAllData}
+            disabled={loading}
+          >
+            <Text style={styles.clearDataButtonText}>
+              {loading ? "Limpando..." : "Limpar Todos os Dados"}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.warningText}>
+            ⚠️ Esta ação irá deletar permanentemente todos os seus campeonatos e
+            dados
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -226,21 +270,6 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.text,
   },
-  compatibilityCard: {
-    backgroundColor: theme.colors.secondary + "15",
-    borderRadius: theme.spacing.sm,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-  },
-  compatibilityTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.secondary,
-    marginBottom: theme.spacing.sm,
-  },
-  compatibilityText: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-  },
   startButton: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.spacing.sm,
@@ -251,6 +280,30 @@ const styles = StyleSheet.create({
   startButtonText: {
     ...theme.typography.button,
     color: theme.colors.white,
+  },
+  section: {
+    marginBottom: theme.spacing.lg,
+  },
+  clearDataButton: {
+    backgroundColor: "#ff4444",
+    borderRadius: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: "center",
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: "#cc0000",
+  },
+  clearDataButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontWeight: "bold",
+  },
+  warningText: {
+    ...theme.typography.caption,
+    color: "#ff4444",
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });
 
