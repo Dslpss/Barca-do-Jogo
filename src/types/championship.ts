@@ -7,6 +7,7 @@ export interface Player {
   position: string;
   yellowCards: number;
   redCards: number;
+  cpf?: string; // Campo opcional para CPF
 }
 
 export interface Team {

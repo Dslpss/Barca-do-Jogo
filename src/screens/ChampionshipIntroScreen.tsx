@@ -34,6 +34,12 @@ const ChampionshipIntroScreen = () => {
       action: () => navigation.navigate("ChampionshipPlayers"),
     },
     {
+      icon: "search",
+      title: "Todos os Jogadores",
+      description: "Visualize e busque jogadores por nome, CPF ou time",
+      action: () => navigation.navigate("ChampionshipAllPlayers"),
+    },
+    {
       icon: "calendar",
       title: "Gerar Partidas",
       description: "Crie a tabela de jogos do campeonato",

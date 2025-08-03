@@ -16,6 +16,7 @@ import ChampionshipIntroScreen from "./src/screens/ChampionshipIntroScreen";
 import ChampionshipManagerScreen from "./src/screens/ChampionshipManagerScreen";
 import ChampionshipTeamsScreen from "./src/screens/ChampionshipTeamsScreen";
 import ChampionshipPlayersScreen from "./src/screens/ChampionshipPlayersScreen";
+import ChampionshipAllPlayersScreen from "./src/screens/ChampionshipAllPlayersScreen";
 import ChampionshipMatchesScreen from "./src/screens/ChampionshipMatchesScreen";
 import ChampionshipTableScreen from "./src/screens/ChampionshipTableScreen";
 
@@ -66,6 +67,10 @@ export default function App() {
             <Stack.Screen
               name="ChampionshipPlayers"
               component={ChampionshipPlayersScreen}
+            />
+            <Stack.Screen
+              name="ChampionshipAllPlayers"
+              component={ChampionshipAllPlayersScreen}
             />
             <Stack.Screen
               name="ChampionshipMatches"

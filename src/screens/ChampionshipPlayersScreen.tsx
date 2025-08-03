@@ -15,6 +15,7 @@ import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
 import { Player, Team } from "../types/championship";
+import { validateCPF } from "../utils/cpfValidator";
 
 // Posições disponíveis
 const POSITIONS = [
@@ -41,6 +42,31 @@ const ChampionshipPlayersScreen = () => {
   const [playerName, setPlayerName] = useState("");
   const [playerSkill, setPlayerSkill] = useState(3);
   const [playerPosition, setPlayerPosition] = useState("Qualquer");
+  const [playerCpf, setPlayerCpf] = useState("");
+
+  // Função para formatar CPF automaticamente
+  const formatCPF = (value: string) => {
+    // Remove tudo que não é dígito
+    const cleanValue = value.replace(/\D/g, "");
+
+    // Aplica máscara
+    if (cleanValue.length <= 11) {
+      return cleanValue
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    }
+    return cleanValue
+      .substring(0, 11)
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  };
+
+  const handleCPFChange = (value: string) => {
+    const formatted = formatCPF(value);
+    setPlayerCpf(formatted);
+  };
 
   useEffect(() => {
     if (isFocused) {
@@ -59,6 +85,12 @@ const ChampionshipPlayersScreen = () => {
       return;
     }
 
+    // Validar CPF se fornecido
+    if (playerCpf.trim() && !validateCPF(playerCpf.replace(/\D/g, ""))) {
+      Alert.alert("Erro", "CPF inválido. Verifique os números digitados.");
+      return;
+    }
+
     try {
       const newPlayer: Omit<Player, "id"> = {
         name: playerName.trim(),
@@ -66,12 +98,14 @@ const ChampionshipPlayersScreen = () => {
         position: playerPosition,
         yellowCards: 0,
         redCards: 0,
+        cpf: playerCpf.trim() || undefined, // Salva CPF formatado se fornecido
       };
 
       await addPlayerToTeam(selectedTeamId, newPlayer);
       setPlayerName("");
       setPlayerSkill(3);
       setPlayerPosition("Qualquer");
+      setPlayerCpf("");
       setSelectedTeamId("");
       setShowAddModal(false);
       Alert.alert("Sucesso", "Jogador adicionado com sucesso!");
@@ -136,6 +170,9 @@ const ChampionshipPlayersScreen = () => {
       <View style={styles.playerHeader}>
         <View style={styles.playerInfo}>
           <Text style={styles.playerName}>{player.name}</Text>
+          {player.cpf && (
+            <Text style={styles.playerCpf}>CPF: {player.cpf}</Text>
+          )}
           <View style={styles.playerDetails}>
             <View style={styles.positionBadge}>
               <Text style={styles.positionText}>{player.position}</Text>
@@ -287,6 +324,16 @@ const ChampionshipPlayersScreen = () => {
               placeholderTextColor={theme.colors.textSecondary}
             />
 
+            <TextInput
+              style={styles.input}
+              placeholder="CPF (opcional)"
+              value={playerCpf}
+              onChangeText={handleCPFChange}
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="numeric"
+              maxLength={14} // Permite formatação XXX.XXX.XXX-XX
+            />
+
             <Text style={styles.positionLabel}>Posição:</Text>
             <ScrollView
               horizontal
@@ -326,6 +373,7 @@ const ChampionshipPlayersScreen = () => {
                   setPlayerName("");
                   setPlayerSkill(3);
                   setPlayerPosition("Qualquer");
+                  setPlayerCpf("");
                   setSelectedTeamId("");
                 }}
               >
@@ -486,6 +534,12 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontWeight: "bold",
     marginBottom: theme.spacing.xs,
+  },
+  playerCpf: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    fontSize: 11,
   },
   playerDetails: {
     flexDirection: "row",
