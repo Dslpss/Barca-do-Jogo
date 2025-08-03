@@ -608,12 +608,67 @@ const ChampionshipMatchesScreen = () => {
 
       <View style={styles.content}>
         <View style={styles.championshipInfo}>
-          <Text style={styles.championshipName}>
-            {currentChampionship.name}
-          </Text>
-          <Text style={styles.matchesProgress}>
-            {playedMatches} de {totalMatches} partidas realizadas
-          </Text>
+          <View style={styles.championshipHeader}>
+            <View style={styles.championshipTitleContainer}>
+              <Text style={styles.championshipIcon}>🏆</Text>
+              <Text style={styles.championshipName}>
+                {currentChampionship.name}
+              </Text>
+            </View>
+            <View style={styles.championshipBadge}>
+              <Text style={styles.championshipBadgeText}>ATIVO</Text>
+            </View>
+          </View>
+
+          <View style={styles.progressSection}>
+            <View style={styles.progressInfo}>
+              <Text style={styles.progressLabel}>Progresso do Campeonato</Text>
+              <Text style={styles.matchesProgress}>
+                {playedMatches} de {totalMatches} partidas realizadas
+              </Text>
+            </View>
+
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width:
+                        totalMatches > 0
+                          ? `${(playedMatches / totalMatches) * 100}%`
+                          : "0%",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressPercentage}>
+                {totalMatches > 0
+                  ? Math.round((playedMatches / totalMatches) * 100)
+                  : 0}
+                %
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>
+                {currentChampionship.teams?.length || 0}
+              </Text>
+              <Text style={styles.statLabel}>Times</Text>
+            </View>
+            <View style={styles.statSeparator} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{totalMatches}</Text>
+              <Text style={styles.statLabel}>Partidas</Text>
+            </View>
+            <View style={styles.statSeparator} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{playedMatches}</Text>
+              <Text style={styles.statLabel}>Finalizadas</Text>
+            </View>
+          </View>
         </View>
 
         {(currentChampionship.teams?.length || 0) < 2 ? (
@@ -1039,20 +1094,122 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   championshipInfo: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.spacing.sm,
-    padding: theme.spacing.md,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.spacing.md,
+    padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+  },
+  championshipHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.md,
+  },
+  championshipTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  championshipIcon: {
+    fontSize: 24,
+    marginRight: theme.spacing.sm,
   },
   championshipName: {
     ...theme.typography.h2,
+    color: theme.colors.text,
+    fontWeight: "bold",
+    flex: 1,
+  },
+  championshipBadge: {
+    backgroundColor: theme.colors.success,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.spacing.xs,
+  },
+  championshipBadgeText: {
+    ...theme.typography.caption,
     color: theme.colors.white,
+    fontWeight: "bold",
+    fontSize: 10,
+  },
+  progressSection: {
+    marginBottom: theme.spacing.md,
+  },
+  progressInfo: {
+    marginBottom: theme.spacing.sm,
+  },
+  progressLabel: {
+    ...theme.typography.label,
+    color: theme.colors.textSecondary,
     marginBottom: theme.spacing.xs,
+    fontWeight: "600",
   },
   matchesProgress: {
     ...theme.typography.body,
-    color: theme.colors.white,
-    opacity: 0.9,
+    color: theme.colors.text,
+    fontWeight: "500",
+  },
+  progressBarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+  },
+  progressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: theme.colors.border,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: theme.colors.primary,
+    borderRadius: 4,
+  },
+  progressPercentage: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    fontWeight: "bold",
+    minWidth: 35,
+    textAlign: "right",
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  statItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  statNumber: {
+    ...theme.typography.h3,
+    color: theme.colors.primary,
+    fontWeight: "bold",
+    marginBottom: theme.spacing.xs,
+  },
+  statLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    fontWeight: "500",
+  },
+  statSeparator: {
+    width: 1,
+    height: 30,
+    backgroundColor: theme.colors.border,
   },
   emptyState: {
     flex: 1,
