@@ -5,6 +5,7 @@ import {
   Player,
   Match,
   ChampionshipStats,
+  GoalScorer,
 } from "../types/championship";
 import { ChampionshipService } from "../services/championshipService";
 
@@ -203,8 +204,8 @@ export const useChampionship = () => {
     matchId: string,
     homeScore: number,
     awayScore: number,
-    homeGoalScorers: string[] = [],
-    awayGoalScorers: string[] = []
+    homeGoalScorers: GoalScorer[] = [],
+    awayGoalScorers: GoalScorer[] = []
   ) => {
     if (!currentChampionship) throw new Error("Nenhum campeonato selecionado");
 
@@ -307,15 +308,27 @@ export const useChampionship = () => {
       awayStats.goalDifference = awayStats.goalsFor - awayStats.goalsAgainst;
 
       // Contar gols dos jogadores
-      match.homeGoalScorers?.forEach((playerId) => {
-        if (playerStats[playerId]) {
-          playerStats[playerId].goals++;
+      match.homeGoalScorers?.forEach((goalScorer) => {
+        if (playerStats[goalScorer.playerId]) {
+          playerStats[goalScorer.playerId].goals += goalScorer.goals;
+          if (goalScorer.yellowCard) {
+            playerStats[goalScorer.playerId].yellowCards++;
+          }
+          if (goalScorer.redCard) {
+            playerStats[goalScorer.playerId].redCards++;
+          }
         }
       });
 
-      match.awayGoalScorers?.forEach((playerId) => {
-        if (playerStats[playerId]) {
-          playerStats[playerId].goals++;
+      match.awayGoalScorers?.forEach((goalScorer) => {
+        if (playerStats[goalScorer.playerId]) {
+          playerStats[goalScorer.playerId].goals += goalScorer.goals;
+          if (goalScorer.yellowCard) {
+            playerStats[goalScorer.playerId].yellowCards++;
+          }
+          if (goalScorer.redCard) {
+            playerStats[goalScorer.playerId].redCards++;
+          }
         }
       });
     });

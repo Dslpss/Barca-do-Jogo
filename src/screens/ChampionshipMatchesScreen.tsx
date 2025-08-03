@@ -8,12 +8,13 @@ import {
   Alert,
   TextInput,
   FlatList,
+  Modal,
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
-import { Match, Team } from "../types/championship";
+import { Match, Team, GoalScorer } from "../types/championship";
 
 const ChampionshipMatchesScreen = () => {
   const isFocused = useIsFocused();
@@ -28,10 +29,18 @@ const ChampionshipMatchesScreen = () => {
     [matchId: string]: {
       home: string;
       away: string;
-      homeGoalScorers: string[];
-      awayGoalScorers: string[];
+      homeGoalScorers: GoalScorer[];
+      awayGoalScorers: GoalScorer[];
     };
   }>({});
+
+  const [playerDetailsModal, setPlayerDetailsModal] = useState<{
+    visible: boolean;
+    matchId: string;
+    team: "home" | "away";
+    playerId: string;
+    playerName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isFocused) {
@@ -123,26 +132,18 @@ const ChampionshipMatchesScreen = () => {
     team: "home" | "away",
     playerId: string
   ) => {
-    setMatchScores((prev) => {
-      const current = prev[matchId] || {
-        home: "",
-        away: "",
-        homeGoalScorers: [],
-        awayGoalScorers: [],
-      };
-      const field = team === "home" ? "homeGoalScorers" : "awayGoalScorers";
-      const currentScorers = current[field] || [];
+    // Abrir modal para definir detalhes
+    const playerName =
+      currentChampionship?.teams
+        .flatMap((t) => t.players)
+        .find((p) => p.id === playerId)?.name || "";
 
-      if (!currentScorers.includes(playerId)) {
-        return {
-          ...prev,
-          [matchId]: {
-            ...current,
-            [field]: [...currentScorers, playerId],
-          },
-        };
-      }
-      return prev;
+    setPlayerDetailsModal({
+      visible: true,
+      matchId,
+      team,
+      playerId,
+      playerName,
     });
   };
 
@@ -165,10 +166,64 @@ const ChampionshipMatchesScreen = () => {
         ...prev,
         [matchId]: {
           ...current,
-          [field]: currentScorers.filter((id) => id !== playerId),
+          [field]: currentScorers.filter(
+            (scorer) => scorer.playerId !== playerId
+          ),
         },
       };
     });
+  };
+
+  const addPlayerDetails = (
+    goals: number,
+    yellowCard: boolean,
+    redCard: boolean
+  ) => {
+    if (!playerDetailsModal) return;
+
+    const { matchId, team, playerId } = playerDetailsModal;
+
+    setMatchScores((prev) => {
+      const current = prev[matchId] || {
+        home: "",
+        away: "",
+        homeGoalScorers: [],
+        awayGoalScorers: [],
+      };
+      const field = team === "home" ? "homeGoalScorers" : "awayGoalScorers";
+      const currentScorers = current[field] || [];
+
+      // Verificar se jogador já existe, se sim, atualizar
+      const existingIndex = currentScorers.findIndex(
+        (scorer) => scorer.playerId === playerId
+      );
+      let newScorers;
+
+      if (existingIndex >= 0) {
+        newScorers = [...currentScorers];
+        newScorers[existingIndex] = {
+          playerId,
+          goals,
+          yellowCard: yellowCard || newScorers[existingIndex].yellowCard,
+          redCard: redCard || newScorers[existingIndex].redCard,
+        };
+      } else {
+        newScorers = [
+          ...currentScorers,
+          { playerId, goals, yellowCard, redCard },
+        ];
+      }
+
+      return {
+        ...prev,
+        [matchId]: {
+          ...current,
+          [field]: newScorers,
+        },
+      };
+    });
+
+    setPlayerDetailsModal(null);
   };
 
   const renderGoalScorerButtons = (match: Match, team: "home" | "away") => {
@@ -186,7 +241,11 @@ const ChampionshipMatchesScreen = () => {
         <Text style={styles.goalScorersTitle}>{teamData.name}:</Text>
         <View style={styles.goalScorersGrid}>
           {teamData.players.map((player) => {
-            const isSelected = selectedScorers.includes(player.id);
+            const playerScorer = selectedScorers.find(
+              (scorer) => scorer.playerId === player.id
+            );
+            const isSelected = !!playerScorer;
+
             return (
               <TouchableOpacity
                 key={player.id}
@@ -209,6 +268,13 @@ const ChampionshipMatchesScreen = () => {
                   ]}
                 >
                   {player.name}
+                  {isSelected && playerScorer && (
+                    <Text style={{ fontSize: 10 }}>
+                      {"\n"}⚽{playerScorer.goals}
+                      {playerScorer.yellowCard && " 🟨"}
+                      {playerScorer.redCard && " 🟥"}
+                    </Text>
+                  )}
                 </Text>
               </TouchableOpacity>
             );
@@ -218,7 +284,16 @@ const ChampionshipMatchesScreen = () => {
           <Text style={styles.selectedScorersText}>
             Goleadores:{" "}
             {selectedScorers
-              .map((id) => teamData.players.find((p) => p.id === id)?.name)
+              .map((scorer) => {
+                const player = teamData.players.find(
+                  (p) => p.id === scorer.playerId
+                );
+                return player
+                  ? `${player.name} (${scorer.goals}⚽${
+                      scorer.yellowCard ? " 🟨" : ""
+                    }${scorer.redCard ? " 🟥" : ""})`
+                  : "";
+              })
               .filter(Boolean)
               .join(", ")}
           </Text>
@@ -286,9 +361,16 @@ const ChampionshipMatchesScreen = () => {
                   <Text style={styles.goalScorersInfoText}>
                     ⚽ {homeTeam.name}:{" "}
                     {match.homeGoalScorers
-                      .map(
-                        (id) => homeTeam.players.find((p) => p.id === id)?.name
-                      )
+                      .map((scorer) => {
+                        const player = homeTeam.players.find(
+                          (p) => p.id === scorer.playerId
+                        );
+                        return player
+                          ? `${player.name} (${scorer.goals}⚽${
+                              scorer.yellowCard ? " 🟨" : ""
+                            }${scorer.redCard ? " 🟥" : ""})`
+                          : "";
+                      })
                       .filter(Boolean)
                       .join(", ")}
                   </Text>
@@ -297,9 +379,16 @@ const ChampionshipMatchesScreen = () => {
                   <Text style={styles.goalScorersInfoText}>
                     ⚽ {awayTeam.name}:{" "}
                     {match.awayGoalScorers
-                      .map(
-                        (id) => awayTeam.players.find((p) => p.id === id)?.name
-                      )
+                      .map((scorer) => {
+                        const player = awayTeam.players.find(
+                          (p) => p.id === scorer.playerId
+                        );
+                        return player
+                          ? `${player.name} (${scorer.goals}⚽${
+                              scorer.yellowCard ? " 🟨" : ""
+                            }${scorer.redCard ? " 🟥" : ""})`
+                          : "";
+                      })
                       .filter(Boolean)
                       .join(", ")}
                   </Text>
@@ -430,7 +519,108 @@ const ChampionshipMatchesScreen = () => {
           </>
         )}
       </View>
+
+      {/* Modal de Detalhes do Jogador */}
+      <PlayerDetailsModal
+        visible={playerDetailsModal?.visible || false}
+        playerName={playerDetailsModal?.playerName || ""}
+        onClose={() => setPlayerDetailsModal(null)}
+        onSave={addPlayerDetails}
+      />
     </View>
+  );
+};
+
+// Componente Modal para detalhes do jogador
+const PlayerDetailsModal = ({
+  visible,
+  playerName,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  playerName: string;
+  onClose: () => void;
+  onSave: (goals: number, yellowCard: boolean, redCard: boolean) => void;
+}) => {
+  const [goals, setGoals] = useState("1");
+  const [yellowCard, setYellowCard] = useState(false);
+  const [redCard, setRedCard] = useState(false);
+
+  const handleSave = () => {
+    const goalsNum = parseInt(goals) || 1;
+    onSave(goalsNum, yellowCard, redCard);
+    // Reset values
+    setGoals("1");
+    setYellowCard(false);
+    setRedCard(false);
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.modal}>
+          <Text style={modalStyles.title}>Detalhes - {playerName}</Text>
+
+          <View style={modalStyles.section}>
+            <Text style={modalStyles.label}>Quantidade de Gols:</Text>
+            <TextInput
+              style={modalStyles.input}
+              value={goals}
+              onChangeText={setGoals}
+              keyboardType="numeric"
+              placeholder="1"
+            />
+          </View>
+
+          <View style={modalStyles.section}>
+            <Text style={modalStyles.label}>Cartões:</Text>
+            <View style={modalStyles.cardRow}>
+              <TouchableOpacity
+                style={[
+                  modalStyles.cardButton,
+                  yellowCard && modalStyles.cardButtonSelected,
+                ]}
+                onPress={() => setYellowCard(!yellowCard)}
+              >
+                <Text style={modalStyles.cardText}>🟨 Amarelo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  modalStyles.cardButton,
+                  redCard && modalStyles.cardButtonSelected,
+                ]}
+                onPress={() => setRedCard(!redCard)}
+              >
+                <Text style={modalStyles.cardText}>🟥 Vermelho</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={modalStyles.buttonRow}>
+            <TouchableOpacity
+              style={modalStyles.cancelButton}
+              onPress={onClose}
+            >
+              <Text style={modalStyles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={modalStyles.saveButton}
+              onPress={handleSave}
+            >
+              <Text style={modalStyles.saveButtonText}>Confirmar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
@@ -665,6 +855,97 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   recordButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modal: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.spacing.md,
+    padding: theme.spacing.lg,
+    margin: theme.spacing.lg,
+    width: "80%",
+    maxWidth: 400,
+  },
+  title: {
+    ...theme.typography.h3,
+    color: theme.colors.text,
+    textAlign: "center",
+    marginBottom: theme.spacing.lg,
+  },
+  section: {
+    marginBottom: theme.spacing.lg,
+  },
+  label: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    fontWeight: "600",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.card,
+    color: theme.colors.text,
+    fontSize: 16,
+    textAlign: "center",
+  },
+  cardRow: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+  },
+  cardButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    alignItems: "center",
+    backgroundColor: theme.colors.card,
+  },
+  cardButtonSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  cardText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.lg,
+  },
+  cancelButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.text,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    alignItems: "center",
+  },
+  saveButtonText: {
     ...theme.typography.button,
     color: theme.colors.white,
   },

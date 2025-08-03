@@ -1,5 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Championship, Team, Player, Match } from "../types/championship";
+import {
+  Championship,
+  Team,
+  Player,
+  Match,
+  GoalScorer,
+} from "../types/championship";
 
 const CHAMPIONSHIPS_KEY = "championships";
 const CURRENT_CHAMPIONSHIP_KEY = "currentChampionship";
@@ -271,8 +277,8 @@ export class ChampionshipService {
     matchId: string,
     homeScore: number,
     awayScore: number,
-    homeGoalScorers: string[] = [],
-    awayGoalScorers: string[] = []
+    homeGoalScorers: GoalScorer[] = [],
+    awayGoalScorers: GoalScorer[] = []
   ): Promise<void> {
     const championship = await this.getChampionshipById(championshipId);
     if (!championship) throw new Error("Campeonato não encontrado");

@@ -16,6 +16,13 @@ export interface Team {
   players: Player[];
 }
 
+export interface GoalScorer {
+  playerId: string;
+  goals: number;
+  yellowCard?: boolean;
+  redCard?: boolean;
+}
+
 export interface Match {
   id: string;
   homeTeam: string; // Team ID
@@ -24,8 +31,8 @@ export interface Match {
   awayScore?: number;
   date?: string;
   played: boolean;
-  homeGoalScorers?: string[]; // Player IDs
-  awayGoalScorers?: string[]; // Player IDs
+  homeGoalScorers?: GoalScorer[]; // Detailed goal and card info
+  awayGoalScorers?: GoalScorer[]; // Detailed goal and card info
 }
 
 export interface Championship {
