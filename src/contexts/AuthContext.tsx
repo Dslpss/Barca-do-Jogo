@@ -7,6 +7,7 @@ import {
 } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "../config/firebaseConfig";
+import useFirebaseAuthPersistence from "../hooks/useFirebaseAuthPersistence";
 
 interface AuthContextType {
   user: User | null;
@@ -35,6 +36,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Configurar persistência do Firebase Auth
+  useFirebaseAuthPersistence();
+
   useEffect(() => {
     // Verificar se há dados de autenticação salvos localmente
     const checkStoredAuth = async () => {
@@ -48,16 +52,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } catch (error) {
         // Se falhar, limpar dados armazenados
+        console.log("Erro no login silencioso:", error);
         await AsyncStorage.multiRemove(["userEmail", "userPassword"]);
       }
     };
 
     checkStoredAuth();
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        setUser(user);
+        setLoading(false);
+      },
+      (error) => {
+        console.log("Erro no onAuthStateChanged:", error);
+        setLoading(false);
+      }
+    );
 
     return unsubscribe;
   }, []);
