@@ -631,11 +631,11 @@ const ChampionshipManagerScreen = () => {
             <Text style={styles.modalTitle}>Criar Novo Campeonato</Text>
 
             <TextInput
-              style={[styles.input, { color: theme.colors.text }]}
+              style={[styles.input, { color: "#000000" }]}
               placeholder="Nome do campeonato"
               value={newChampionshipName}
               onChangeText={setNewChampionshipName}
-              placeholderTextColor={theme.colors.textSecondary}
+              placeholderTextColor="#666666"
               selectionColor={theme.colors.primary}
             />
 

@@ -213,11 +213,11 @@ const ChampionshipTeamsScreen = () => {
             <Text style={styles.modalTitle}>Adicionar Time</Text>
 
             <TextInput
-              style={[styles.input, { color: theme.colors.text }]}
+              style={[styles.input, { color: "#000000" }]}
               placeholder="Nome do time"
               value={teamName}
               onChangeText={setTeamName}
-              placeholderTextColor={theme.colors.textSecondary}
+              placeholderTextColor="#666666"
               selectionColor={theme.colors.primary}
             />
 

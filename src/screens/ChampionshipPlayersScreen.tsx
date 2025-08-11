@@ -318,20 +318,20 @@ const ChampionshipPlayersScreen = () => {
             <Text style={styles.modalTitle}>Adicionar Jogador</Text>
 
             <TextInput
-              style={[styles.input, { color: theme.colors.text }]}
+              style={[styles.input, { color: "#000000" }]}
               placeholder="Nome do jogador"
               value={playerName}
               onChangeText={setPlayerName}
-              placeholderTextColor={theme.colors.textSecondary}
+              placeholderTextColor="#666666"
               selectionColor={theme.colors.primary}
             />
 
             <TextInput
-              style={[styles.input, { color: theme.colors.text }]}
+              style={[styles.input, { color: "#000000" }]}
               placeholder="CPF (opcional)"
               value={playerCpf}
               onChangeText={handleCPFChange}
-              placeholderTextColor={theme.colors.textSecondary}
+              placeholderTextColor="#666666"
               selectionColor={theme.colors.primary}
               keyboardType="numeric"
               maxLength={14} // Permite formatação XXX.XXX.XXX-XX
