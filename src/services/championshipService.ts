@@ -110,10 +110,33 @@ export class ChampionshipService {
 
       const championships: Championship[] = [];
       snapshot.forEach((doc) => {
-        championships.push({
-          id: doc.id,
-          ...doc.data(),
-        } as Championship);
+        const data = doc.data();
+
+        // Verificar se o campeonato tem ID válido
+        let championshipId = data.id || doc.id;
+        if (!championshipId || championshipId.trim() === "") {
+          console.log("🔧 Corrigindo ID vazio, usando doc.id:", doc.id);
+          championshipId = doc.id;
+        }
+
+        const championship: Championship = {
+          id: championshipId,
+          name: data.name || "Campeonato Sem Nome",
+          type: data.type || "pontos_corridos",
+          status: data.status || "criado",
+          teams: data.teams || [],
+          matches: data.matches || [],
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+        };
+
+        // Se o ID foi corrigido, atualizar no Firebase
+        if (data.id !== championshipId) {
+          console.log("🔧 Atualizando ID no Firebase:", championshipId);
+          this.updateChampionship(championship).catch(console.error);
+        }
+
+        championships.push(championship);
       });
 
       console.log(
@@ -194,8 +217,15 @@ export class ChampionshipService {
     }
 
     const currentDate = new Date().toISOString();
+
+    // Gerar o ID primeiro
+    const newChampionshipRef = doc(collection(db, "championships"));
+    const championshipId = newChampionshipRef.id;
+
+    console.log("🆔 ID gerado para o campeonato:", championshipId);
+
     const newChampionship: Championship = {
-      id: "", // Será definido pelo Firebase
+      id: championshipId, // Usar o ID gerado
       name: name.trim(),
       type,
       status: "criado",
@@ -213,8 +243,7 @@ export class ChampionshipService {
       updatedAt: currentDate,
     });
 
-    const newChampionshipRef = doc(collection(db, "championships"));
-    newChampionship.id = newChampionshipRef.id;
+    console.log("💾 Salvando campeonato com ID:", championshipData.id);
     await setDoc(newChampionshipRef, championshipData);
 
     console.log("✅ Campeonato criado no Firebase:", newChampionship.id);
@@ -268,6 +297,9 @@ export class ChampionshipService {
     updatedChampionship: Championship,
     forceReload: boolean = true
   ): Promise<void> {
+    if (!updatedChampionship?.id || updatedChampionship.id.trim() === "") {
+      throw new Error("ID de campeonato inválido para atualização");
+    }
     console.log(
       "🔄 Service: Atualizando campeonato:",
       updatedChampionship.name
@@ -405,6 +437,9 @@ export class ChampionshipService {
 
   // Deletar campeonato
   static async deleteChampionship(id: string): Promise<void> {
+    if (!id || id.trim() === "") {
+      throw new Error("ID de campeonato inválido para deleção");
+    }
     const userId = this.getUserId();
     if (!userId) {
       throw new Error("Usuário não autenticado");
@@ -430,56 +465,150 @@ export class ChampionshipService {
 
   // Definir campeonato atual
   static async setCurrentChampionship(championshipId: string): Promise<void> {
+    console.log("🎯 Service: Definindo campeonato atual:", championshipId);
     const userId = this.getUserId();
     if (!userId) {
+      console.error("❌ Service: Usuário não autenticado");
       throw new Error("Usuário não autenticado");
     }
 
     if (!(await this.isOnline())) {
+      console.error("❌ Service: Usuário offline");
       throw new Error("Não é possível definir campeonato atual - offline");
     }
 
-    // Salvar apenas no Firebase (sem cache)
-    const userPrefsRef = doc(db, "userPreferences", userId);
-    await setDoc(
-      userPrefsRef,
-      {
-        currentChampionshipId: championshipId,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    try {
+      // Validar ID
+      if (!championshipId || championshipId.trim() === "") {
+        console.error("❌ Service: ID de campeonato inválido ao definir atual");
+        throw new Error("ID de campeonato inválido");
+      }
+
+      // Verificar se o campeonato existe
+      const ref = doc(db, "championships", championshipId);
+      const existsSnap = await getDoc(ref);
+      if (!existsSnap.exists()) {
+        console.error(
+          "❌ Service: Campeonato inexistente para ID:",
+          championshipId
+        );
+        throw new Error("Campeonato não encontrado");
+      }
+
+      // Salvar apenas no Firebase (sem cache)
+      const userPrefsRef = doc(db, "userPreferences", userId);
+      console.log("🔄 Service: Salvando preferência no Firebase...");
+      await setDoc(
+        userPrefsRef,
+        {
+          currentChampionshipId: championshipId,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      console.log("✅ Service: Campeonato atual definido no Firebase!");
+    } catch (error) {
+      console.error("❌ Service: Erro ao salvar no Firebase:", error);
+      throw error;
+    }
   }
 
   // Obter campeonato atual
   static async getCurrentChampionship(): Promise<Championship | null> {
     const userId = this.getUserId();
     if (!userId) {
+      console.log(
+        "⚠️ Service: Usuário não autenticado para getCurrentChampionship"
+      );
       return null;
     }
 
     if (!(await this.isOnline())) {
+      console.log("⚠️ Service: Usuário offline para getCurrentChampionship");
       return null;
     }
 
     // Buscar apenas do Firebase (sem cache)
     try {
+      console.log("🔄 Service: Buscando campeonato atual do Firebase...");
       const userPrefsRef = doc(db, "userPreferences", userId);
       const userPrefsDoc = await getDoc(userPrefsRef);
 
       if (userPrefsDoc.exists()) {
         const userData = userPrefsDoc.data();
         const currentId = userData.currentChampionshipId || null;
+        console.log("📋 Service: CurrentChampionshipId encontrado:", currentId);
 
-        if (currentId) {
-          return await this.getChampionshipById(currentId);
+        if (
+          currentId &&
+          typeof currentId === "string" &&
+          currentId.trim() !== ""
+        ) {
+          console.log("🔄 Service: Carregando dados do campeonato...");
+          const championship = await this.getChampionshipById(currentId);
+          console.log(
+            "✅ Service: Campeonato carregado:",
+            championship?.name || "null"
+          );
+          return championship;
+        } else {
+          console.log("⚠️ Service: Nenhum campeonato atual definido");
         }
+      } else {
+        console.log("⚠️ Service: Documento de preferências não existe");
       }
       return null;
     } catch (error) {
-      console.error("Erro ao obter campeonato atual do Firebase:", error);
+      console.error(
+        "❌ Service: Erro ao obter campeonato atual do Firebase:",
+        error
+      );
       return null;
     }
+  }
+
+  // Reparar campeonatos com ID vazio/inconsistente no Firebase
+  static async repairChampionshipIdsForUser(): Promise<{
+    fixed: number;
+    checked: number;
+  }> {
+    const userId = this.getUserId();
+    if (!userId) throw new Error("Usuário não autenticado");
+    if (!(await this.isOnline())) throw new Error("Offline");
+
+    console.log(
+      "🛠️ Service: Reparando IDs de campeonatos para o usuário:",
+      userId
+    );
+    const championshipsRef = collection(db, "championships");
+    const q = query(championshipsRef, where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    let fixed = 0;
+    let checked = 0;
+
+    for (const docSnap of snapshot.docs) {
+      checked++;
+      const data = docSnap.data() as any;
+      const firestoreId = docSnap.id;
+      const dataId = (data?.id as string) || "";
+      if (!dataId || dataId !== firestoreId) {
+        console.log(
+          "🔧 Service: Corrigindo doc",
+          firestoreId,
+          "(id antigo:",
+          dataId,
+          ")"
+        );
+        const ref = doc(db, "championships", firestoreId);
+        await setDoc(ref, { id: firestoreId }, { merge: true });
+        fixed++;
+      }
+    }
+
+    console.log(
+      `✅ Service: Reparos concluídos. Verificados: ${checked}, Corrigidos: ${fixed}`
+    );
+    return { fixed, checked };
   }
 
   // Adicionar time ao campeonato

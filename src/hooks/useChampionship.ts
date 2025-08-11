@@ -166,14 +166,22 @@ export const useChampionship = () => {
 
   // Selecionar campeonato atual
   const selectChampionship = async (championshipId: string) => {
+    console.log("🎯 Hook: Tentando selecionar campeonato:", championshipId);
     setLoading(true);
     try {
+      console.log(
+        "🔄 Hook: Chamando ChampionshipService.setCurrentChampionship..."
+      );
       await ChampionshipService.setCurrentChampionship(championshipId);
+      console.log(
+        "✅ Hook: Campeonato definido no Firebase, carregando dados..."
+      );
       await loadCurrentChampionship();
+      console.log("🎉 Hook: Campeonato selecionado com sucesso!");
       setError(null);
     } catch (err) {
+      console.error("❌ Hook: Erro ao selecionar campeonato:", err);
       setError("Erro ao selecionar campeonato");
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -599,6 +607,24 @@ export const useChampionship = () => {
     }
   };
 
+  // Reparar campeonatos com ID vazio no Firebase
+  const repairChampionships = async () => {
+    setLoading(true);
+    try {
+      const result = await ChampionshipService.repairChampionshipIdsForUser();
+      console.log("🛠️ Hook: Reparos executados:", result);
+      await loadChampionships();
+      setError(null);
+      return result;
+    } catch (err) {
+      console.error("❌ Hook: Erro ao reparar campeonatos:", err);
+      setError("Erro ao reparar campeonatos");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Finalizar campeonato
   const finishChampionship = async (championshipId?: string) => {
     const id = championshipId || currentChampionship?.id;
@@ -711,6 +737,7 @@ export const useChampionship = () => {
     resumeChampionship,
     finishChampionship,
     deleteChampionship,
+    repairChampionships,
     syncData,
     clearAllData,
   };

@@ -9,8 +9,10 @@ import {
   TextInput,
   Modal,
   FlatList,
+  RefreshControl,
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
@@ -30,6 +32,7 @@ const ChampionshipManagerScreen = () => {
     resumeChampionship,
     finishChampionship,
     deleteChampionship,
+    repairChampionships,
   } = useChampionship();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -40,9 +43,28 @@ const ChampionshipManagerScreen = () => {
 
   React.useEffect(() => {
     if (isFocused) {
+      console.log("🏆 ChampionshipManager: Carregando campeonatos...");
       loadChampionships();
     }
   }, [isFocused]);
+
+  // Debug logs
+  React.useEffect(() => {
+    console.log("📊 ChampionshipManager - Estado atual:");
+    console.log("- Campeonatos carregados:", championships?.length || 0);
+    console.log("- Campeonato atual ID:", currentChampionship?.id || "nenhum");
+    console.log("- Loading:", loading);
+    console.log("- Error:", error);
+
+    if (championships && championships.length > 0) {
+      console.log("📋 Lista de campeonatos:");
+      championships.forEach((c, index) => {
+        console.log(
+          `  ${index + 1}. ${c.name} (ID: ${c.id}) - Status: ${c.status}`
+        );
+      });
+    }
+  }, [championships, currentChampionship, loading, error]);
 
   const handleCreateChampionship = async () => {
     if (!newChampionshipName.trim()) {
@@ -61,12 +83,80 @@ const ChampionshipManagerScreen = () => {
   };
 
   const handleSelectChampionship = async (championshipId: string) => {
+    console.log("🎯 Tentando selecionar campeonato:", championshipId);
+
+    // Verificar se o campeonato existe na lista
+    const championshipExists = championships.find(
+      (c) => c.id === championshipId
+    );
+    if (!championshipExists) {
+      console.error("❌ Campeonato não encontrado na lista:", championshipId);
+      Alert.alert(
+        "Erro",
+        "Campeonato não encontrado. Tente recarregar a lista."
+      );
+      return;
+    }
+
+    console.log("✅ Campeonato encontrado na lista:", championshipExists.name);
+
     try {
       await selectChampionship(championshipId);
-      Alert.alert("Sucesso", "Campeonato selecionado!");
-    } catch (error) {
-      Alert.alert("Erro", "Erro ao selecionar campeonato");
+      console.log("✅ Campeonato selecionado com sucesso!");
+
+      // Forçar um recarregamento para garantir que o estado está atualizado
+      setTimeout(() => {
+        loadChampionships();
+      }, 500);
+
+      Alert.alert(
+        "Sucesso",
+        `Campeonato "${championshipExists.name}" selecionado!`
+      );
+    } catch (err: any) {
+      console.error("❌ Erro ao selecionar campeonato:", err);
+      const message = err?.message || "Erro desconhecido";
+
+      // Tentar diagnóstico do erro
+      if (message?.includes("offline")) {
+        Alert.alert(
+          "Erro de Conexão",
+          "Você está offline. Verifique sua conexão com a internet e tente novamente."
+        );
+      } else if (message?.includes("autenticado")) {
+        Alert.alert(
+          "Erro de Autenticação",
+          "Você não está autenticado. Faça login novamente."
+        );
+      } else {
+        Alert.alert("Erro", `Erro ao selecionar campeonato: ${message}`);
+      }
     }
+  };
+
+  const handleFixChampionships = async () => {
+    Alert.alert(
+      "🔧 Reparar Campeonatos",
+      "Esta função irá corrigir problemas conhecidos nos campeonatos (como IDs vazios). Deseja continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Reparar",
+          style: "default",
+          onPress: async () => {
+            console.log("🔧 Iniciando reparo de campeonatos...");
+            try {
+              // Recarregar campeonatos (isso já faz a correção automaticamente)
+              await loadChampionships();
+              Alert.alert("Sucesso", "Campeonatos reparados com sucesso!");
+            } catch (error) {
+              console.error("❌ Erro ao reparar campeonatos:", error);
+              Alert.alert("Erro", "Erro ao reparar campeonatos.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handlePauseChampionship = async (championshipId: string) => {
@@ -187,100 +277,216 @@ const ChampionshipManagerScreen = () => {
     }
   };
 
-  const renderChampionshipItem = ({ item }: { item: Championship }) => (
-    <TouchableOpacity
-      style={[
-        styles.championshipCard,
-        currentChampionship?.id === item.id && styles.selectedChampionshipCard,
-      ]}
-      onPress={() => handleSelectChampionship(item.id)}
-    >
-      <View style={styles.championshipHeader}>
-        <Text style={styles.championshipName}>{item.name}</Text>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(item.status) },
-          ]}
-        >
-          <Text style={styles.statusText}>{getStatusLabel(item.status)}</Text>
+  const renderChampionshipItem = ({ item }: { item: Championship }) => {
+    const isSelected = currentChampionship?.id === item.id;
+    console.log(
+      `🎮 Renderizando campeonato: ${item.name} (ID: ${item.id}) - Selecionado: ${isSelected}`
+    );
+
+    // Verificar se o ID está vazio e mostrar aviso
+    const hasEmptyId = !item.id || item.id.trim() === "";
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.championshipCard,
+          isSelected && styles.selectedChampionshipCard,
+          hasEmptyId && styles.problemChampionshipCard,
+        ]}
+        onPress={() => {
+          console.log(`👆 Clique no campeonato: ${item.name} (ID: ${item.id})`);
+
+          if (hasEmptyId) {
+            Alert.alert(
+              "⚠️ Problema no Campeonato",
+              `O campeonato "${item.name}" tem um problema de identificação. Use o botão "🔧 Reparar" para corrigir este problema.`,
+              [
+                { text: "OK", style: "default" },
+                {
+                  text: "Reparar Agora",
+                  style: "default",
+                  onPress: () => handleFixChampionships(),
+                },
+              ]
+            );
+            return;
+          }
+
+          handleSelectChampionship(item.id);
+        }}
+      >
+        <View style={styles.championshipHeader}>
+          <View style={styles.nameRow}>
+            <Ionicons
+              name={isSelected ? "trophy" : "football-outline"}
+              size={18}
+              color={theme.colors.text}
+              style={{ marginRight: 8, opacity: 0.9 }}
+            />
+            <Text style={styles.championshipName}>
+              {item.name}
+              {hasEmptyId && " ⚠️"}
+            </Text>
+          </View>
+          <View style={styles.statusGroup}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: getStatusColor(item.status) },
+              ]}
+            />
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: getStatusColor(item.status) },
+              ]}
+            >
+              <Text style={styles.statusText}>
+                {getStatusLabel(item.status)}
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.championshipInfo}>
-        <Text style={styles.infoText}>
-          <Text style={styles.infoLabel}>Tipo: </Text>
-          {getTypeLabel(item.type)}
-        </Text>
-        <Text style={styles.infoText}>
-          <Text style={styles.infoLabel}>Times: </Text>
-          {item.teams?.length || 0}
-        </Text>
-        <Text style={styles.infoText}>
-          <Text style={styles.infoLabel}>Jogos: </Text>
-          {item.matches?.length || 0}
-        </Text>
-      </View>
+        {hasEmptyId && (
+          <View style={styles.problemIndicator}>
+            <Text style={styles.problemText}>
+              ⚠️ Este campeonato precisa ser reparado
+            </Text>
+          </View>
+        )}
 
-      <Text style={styles.dateText}>
-        Criado em:{" "}
-        {(() => {
-          try {
-            const date = new Date(item.createdAt);
-            if (isNaN(date.getTime())) {
+        <View style={styles.championshipInfo}>
+          <View style={styles.infoRow}>
+            <Ionicons
+              name="grid-outline"
+              size={14}
+              color={theme.colors.textSecondary}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.infoText}>
+              <Text style={styles.infoLabel}>Tipo: </Text>
+              {getTypeLabel(item.type)}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons
+              name="people-outline"
+              size={14}
+              color={theme.colors.textSecondary}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.infoText}>
+              <Text style={styles.infoLabel}>Times: </Text>
+              {item.teams?.length || 0}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons
+              name="calendar-outline"
+              size={14}
+              color={theme.colors.textSecondary}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.infoText}>
+              <Text style={styles.infoLabel}>Jogos: </Text>
+              {item.matches?.length || 0}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.dateText}>
+          Criado em:{" "}
+          {(() => {
+            try {
+              const date = new Date(item.createdAt);
+              if (isNaN(date.getTime())) {
+                return "Data inválida";
+              }
+              return date.toLocaleDateString("pt-BR");
+            } catch (error) {
               return "Data inválida";
             }
-            return date.toLocaleDateString("pt-BR");
-          } catch (error) {
-            return "Data inválida";
-          }
-        })()}
-      </Text>
+          })()}
+        </Text>
 
-      {currentChampionship?.id === item.id && (
-        <View style={styles.selectedIndicator}>
-          <Text style={styles.selectedText}>✓ Selecionado</Text>
+        {isSelected && (
+          <View style={styles.selectedIndicator}>
+            <Text style={styles.selectedText}>✓ Selecionado</Text>
+          </View>
+        )}
+
+        {/* Botões de ação */}
+        <View style={styles.actionButtons}>
+          {item.status === "pausado" && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.resumeButton]}
+              onPress={() => handleResumeChampionship(item.id)}
+            >
+              <View style={styles.actionBtnContent}>
+                <Ionicons
+                  name="play"
+                  size={14}
+                  color={"white"}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.actionButtonText}>Retomar</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {(item.status === "criado" || item.status === "em_andamento") && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.pauseButton]}
+              onPress={() => handlePauseChampionship(item.id)}
+            >
+              <View style={styles.actionBtnContent}>
+                <Ionicons
+                  name="pause"
+                  size={14}
+                  color={"white"}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.actionButtonText}>Pausar</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {item.status !== "finalizado" && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.finishButton]}
+              onPress={() => handleFinishChampionship(item.id)}
+            >
+              <View style={styles.actionBtnContent}>
+                <Ionicons
+                  name="flag-outline"
+                  size={14}
+                  color={"white"}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.actionButtonText}>Finalizar</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => handleDeleteChampionship(item.id)}
+          >
+            <View style={styles.actionBtnContent}>
+              <Ionicons
+                name="trash-outline"
+                size={14}
+                color={"white"}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.actionButtonText}>Deletar</Text>
+            </View>
+          </TouchableOpacity>
         </View>
-      )}
-
-      {/* Botões de ação */}
-      <View style={styles.actionButtons}>
-        {item.status === "pausado" && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.resumeButton]}
-            onPress={() => handleResumeChampionship(item.id)}
-          >
-            <Text style={styles.actionButtonText}>▶️ Retomar</Text>
-          </TouchableOpacity>
-        )}
-
-        {(item.status === "criado" || item.status === "em_andamento") && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.pauseButton]}
-            onPress={() => handlePauseChampionship(item.id)}
-          >
-            <Text style={styles.actionButtonText}>⏸️ Pausar</Text>
-          </TouchableOpacity>
-        )}
-
-        {item.status !== "finalizado" && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.finishButton]}
-            onPress={() => handleFinishChampionship(item.id)}
-          >
-            <Text style={styles.actionButtonText}>🏁 Finalizar</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeleteChampionship(item.id)}
-        >
-          <Text style={styles.actionButtonText}>🗑️ Deletar</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -289,8 +495,16 @@ const ChampionshipManagerScreen = () => {
       <View style={styles.content}>
         {currentChampionship && (
           <View style={styles.currentChampionshipCard}>
-            <Text style={styles.currentTitle}>Campeonato Atual:</Text>
-            <Text style={styles.currentName}>{currentChampionship.name}</Text>
+            <Text style={styles.currentTitle}>Campeonato Atual</Text>
+            <View style={styles.currentNameRow}>
+              <Ionicons
+                name="trophy"
+                size={18}
+                color={theme.colors.white}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.currentName}>{currentChampionship.name}</Text>
+            </View>
             <Text style={styles.currentInfo}>
               {getTypeLabel(currentChampionship.type)} •{" "}
               {getStatusLabel(currentChampionship.status)}
@@ -300,13 +514,80 @@ const ChampionshipManagerScreen = () => {
 
         <View style={styles.header}>
           <Text style={styles.sectionTitle}>Seus Campeonatos</Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => setShowCreateModal(true)}
-          >
-            <Text style={styles.createButtonText}>+ Novo</Text>
-          </TouchableOpacity>
         </View>
+
+        <View style={styles.headerActions}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.headerButtonsContainer}
+          >
+            <TouchableOpacity
+              style={[styles.headerButton, styles.refreshButton]}
+              onPress={() => {
+                console.log("🔄 Recarregando campeonatos manualmente...");
+                loadChampionships();
+              }}
+              disabled={loading}
+            >
+              <View style={styles.headerBtnContent}>
+                <Ionicons
+                  name="refresh"
+                  size={16}
+                  color="white"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.headerButtonText}>Atualizar</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.headerButton, styles.fixButton]}
+              onPress={async () => {
+                try {
+                  const result = await repairChampionships();
+                  Alert.alert(
+                    "Reparo concluído",
+                    `Verificados: ${result.checked}\nCorrigidos: ${result.fixed}`
+                  );
+                } catch (e: any) {
+                  Alert.alert(
+                    "Erro",
+                    e?.message || "Erro ao reparar campeonatos"
+                  );
+                }
+              }}
+              disabled={loading}
+            >
+              <View style={styles.headerBtnContent}>
+                <Ionicons
+                  name="construct"
+                  size={16}
+                  color="white"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.headerButtonText}>Reparar</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.headerButton, styles.createNewButton]}
+              onPress={() => setShowCreateModal(true)}
+            >
+              <View style={styles.headerBtnContent}>
+                <Ionicons
+                  name="add"
+                  size={16}
+                  color="white"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.headerButtonText}>Novo</Text>
+              </View>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
+        <Text style={styles.sectionSubtitle}>
+          Selecione, pause, retome ou finalize seus campeonatos
+        </Text>
 
         {loading ? (
           <Text style={styles.loadingText}>Carregando...</Text>
@@ -326,6 +607,14 @@ const ChampionshipManagerScreen = () => {
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContainer}
+            refreshControl={
+              <RefreshControl
+                refreshing={!!loading}
+                onRefresh={loadChampionships}
+                tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
+              />
+            }
           />
         )}
       </View>
@@ -415,12 +704,23 @@ const styles = StyleSheet.create({
     borderRadius: theme.spacing.sm,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
+    // shadow for iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    // elevation for Android
+    elevation: 3,
   },
   currentTitle: {
     ...theme.typography.caption,
     color: theme.colors.white,
     opacity: 0.8,
     marginBottom: theme.spacing.xs,
+  },
+  currentNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   currentName: {
     ...theme.typography.h2,
@@ -433,23 +733,55 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    marginBottom: theme.spacing.sm,
+  },
+  headerActions: {
     marginBottom: theme.spacing.md,
+  },
+  headerButtonsContainer: {
+    paddingHorizontal: 2,
+    gap: 8,
+    flexDirection: "row",
   },
   sectionTitle: {
     ...theme.typography.h2,
     color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
   },
-  createButton: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+  sectionSubtitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
+  },
+  headerButton: {
+    height: 36,
+    paddingHorizontal: 12,
     borderRadius: theme.spacing.sm,
+    backgroundColor: theme.colors.primary,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 1,
+    elevation: 1,
   },
-  createButtonText: {
+  headerBtnContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+  },
+  refreshButton: {
+    backgroundColor: theme.colors.secondary,
+  },
+  fixButton: {
+    backgroundColor: "#FF9800", // Laranja para indicar reparo
+  },
+  createNewButton: {
+    backgroundColor: theme.colors.primary,
+  },
+  headerButtonText: {
     ...theme.typography.button,
+    fontSize: 14,
     color: theme.colors.white,
   },
   loadingText: {
@@ -491,9 +823,32 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     borderWidth: 2,
     borderColor: "transparent",
+    // shadow for iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    // elevation for Android
+    elevation: 2,
   },
   selectedChampionshipCard: {
     borderColor: theme.colors.primary,
+  },
+  problemChampionshipCard: {
+    borderColor: "#FF9800",
+    backgroundColor: "#FFF3E0",
+  },
+  problemIndicator: {
+    backgroundColor: "#FF9800",
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
+  },
+  problemText: {
+    ...theme.typography.caption,
+    color: theme.colors.white,
+    fontWeight: "bold",
   },
   championshipHeader: {
     flexDirection: "row",
@@ -501,11 +856,26 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: theme.spacing.sm,
   },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
   championshipName: {
     ...theme.typography.h3,
     color: theme.colors.text,
     flex: 1,
     marginRight: theme.spacing.sm,
+  },
+  statusGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
   },
   statusBadge: {
     paddingHorizontal: theme.spacing.sm,
@@ -520,6 +890,11 @@ const styles = StyleSheet.create({
   },
   championshipInfo: {
     marginBottom: theme.spacing.sm,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: theme.spacing.xs,
   },
   infoText: {
     ...theme.typography.body,
@@ -625,24 +1000,37 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.xs,
+    gap: 8,
     marginTop: theme.spacing.sm,
     paddingTop: theme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    justifyContent: "flex-start",
   },
   actionButton: {
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: theme.spacing.sm,
-    minWidth: 80,
+    minWidth: 90,
+    height: 32,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  actionBtnContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
   },
   actionButtonText: {
     ...theme.typography.caption,
     fontSize: 12,
     fontWeight: "600",
     color: "white",
+    textAlign: "center",
   },
   resumeButton: {
     backgroundColor: "#4CAF50",
