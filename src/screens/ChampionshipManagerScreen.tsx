@@ -365,8 +365,7 @@ const ChampionshipManagerScreen = () => {
               style={{ marginRight: 6 }}
             />
             <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Tipo: </Text>
-              {getTypeLabel(item.type)}
+              <Text style={styles.infoLabel}>Tipo: {getTypeLabel(item.type)}</Text>
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -377,8 +376,7 @@ const ChampionshipManagerScreen = () => {
               style={{ marginRight: 6 }}
             />
             <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Times: </Text>
-              {item.teams?.length || 0}
+              <Text style={styles.infoLabel}>Times: </Text>{item.teams?.length || 0}
             </Text>
           </View>
           <View style={styles.infoRow}>
