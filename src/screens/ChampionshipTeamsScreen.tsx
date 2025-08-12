@@ -125,9 +125,7 @@ const ChampionshipTeamsScreen = () => {
 
       <View style={styles.playersInfo}>
         <Text style={styles.playersCount}>
-          <Text>{item.players.length}</Text>
-          <Text> jogador</Text>
-          {item.players.length !== 1 && <Text>es</Text>}
+          {item.players.length} jogador{item.players.length !== 1 ? "es" : ""}
         </Text>
         {item.players.length > 0 && (
           <Text style={styles.playersList}>

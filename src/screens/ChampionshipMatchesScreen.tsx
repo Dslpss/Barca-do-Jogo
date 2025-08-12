@@ -391,7 +391,7 @@ const ChampionshipMatchesScreen = () => {
   const renderGoalScorerButtons = (match: Match, team: "home" | "away") => {
     const teamId = team === "home" ? match.homeTeam : match.awayTeam;
     const teamData = getTeamById(teamId);
-    if (!teamData || teamData.players.length === 0) return null;
+    if (!teamData || teamData.players.length === 0) return <></>;
 
     const selectedScorers =
       matchScores[match.id]?.[
@@ -400,10 +400,7 @@ const ChampionshipMatchesScreen = () => {
 
     return (
       <View style={styles.goalScorersSection}>
-        <Text style={modalStyles.goalScorersTitle}>
-          <Text>{teamData.name}</Text>
-          <Text>:</Text>
-        </Text>
+        <Text style={modalStyles.goalScorersTitle}>{teamData.name}:</Text>
         <View style={styles.goalScorersGrid}>
           {teamData.players.map((player) => {
             const playerScorer = selectedScorers.find(
@@ -435,7 +432,8 @@ const ChampionshipMatchesScreen = () => {
                   {player.name}
                   {isSelected && playerScorer && (
                     <Text style={{ fontSize: 10 }}>
-                      {"\n"}⚽{playerScorer.goals}
+                      {"\n⚽"}
+                      {playerScorer.goals}
                       {playerScorer.yellowCard ? " 🟨" : ""}
                       {playerScorer.redCard ? " 🟥" : ""}
                     </Text>
@@ -453,16 +451,23 @@ const ChampionshipMatchesScreen = () => {
                 const player = teamData.players.find(
                   (p) => p.id === scorer.playerId
                 );
-                return player ? (
-                  <Text key={scorer.playerId}>
-                    {index > 0 && ", "}
-                    {player.name} ({scorer.goals}⚽
-                    {scorer.yellowCard ? "🟨" : ""}
-                    {scorer.redCard ? "🟥" : ""})
-                  </Text>
-                ) : null;
+                if (!player) return "";
+                const prefix = index > 0 ? ", " : "";
+                const cards =
+                  (scorer.yellowCard ? "🟨" : "") +
+                  (scorer.redCard ? "🟥" : "");
+                return (
+                  prefix +
+                  player.name +
+                  " (" +
+                  scorer.goals +
+                  "⚽" +
+                  cards +
+                  ")"
+                );
               })
-              .filter(Boolean)}
+              .filter(Boolean)
+              .join("")}
           </Text>
         )}
       </View>
@@ -473,16 +478,14 @@ const ChampionshipMatchesScreen = () => {
     const homeTeam = getTeamById(match.homeTeam);
     const awayTeam = getTeamById(match.awayTeam);
 
-    if (!homeTeam || !awayTeam) return null;
+    if (!homeTeam || !awayTeam) return <></>;
 
     return (
       <View style={styles.matchCard}>
         <View style={styles.matchHeader}>
           <View style={styles.teamsContainer}>
             <View style={styles.teamContainer}>
-              <Text style={styles.teamName}>
-                <Text>{homeTeam.name}</Text>
-              </Text>
+              <Text style={styles.teamName}>{homeTeam.name}</Text>
               {homeTeam.color && (
                 <View
                   style={[
@@ -509,9 +512,7 @@ const ChampionshipMatchesScreen = () => {
           {match.played && (
             <View style={styles.resultBadge}>
               <Text style={styles.resultText}>
-                <Text>{match.homeScore}</Text>
-                <Text> - </Text>
-                <Text>{match.awayScore}</Text>
+                {match.homeScore ?? 0} - {match.awayScore ?? 0}
               </Text>
             </View>
           )}
@@ -540,7 +541,7 @@ const ChampionshipMatchesScreen = () => {
                           ? `${player.name} (${scorer.goals}⚽${
                               scorer.yellowCard ? " 🟨" : ""
                             }${scorer.redCard ? " 🟥" : ""})`
-                          : null;
+                          : "";
                       })
                       .filter(Boolean)
                       .join(", ")}
@@ -558,7 +559,7 @@ const ChampionshipMatchesScreen = () => {
                           ? `${player.name} (${scorer.goals}⚽${
                               scorer.yellowCard ? " 🟨" : ""
                             }${scorer.redCard ? " 🟥" : ""})`
-                          : null;
+                          : "";
                       })
                       .filter(Boolean)
                       .join(", ")}
@@ -688,12 +689,8 @@ const ChampionshipMatchesScreen = () => {
             <View style={styles.progressInfo}>
               <Text style={styles.progressLabel}>Progresso do Campeonato</Text>
               <Text style={styles.matchesProgress}>
-                <Text style={styles.matchesInfo}>
-                  <Text>{playedMatches}</Text>
-                  <Text> de </Text>
-                  <Text>{currentChampionship?.matches?.length || 0}</Text>
-                  <Text> partidas realizadas</Text>
-                </Text>
+                {playedMatches} de {currentChampionship?.matches?.length || 0}{" "}
+                partidas realizadas
               </Text>
             </View>
 
@@ -744,9 +741,7 @@ const ChampionshipMatchesScreen = () => {
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Adicione pelo menos 2 times</Text>
             <Text style={styles.emptySubtext}>
-              <Text>
-                É necessário ter pelo menos 2 times para gerar partidas
-              </Text>
+              É necessário ter pelo menos 2 times para gerar partidas
             </Text>
           </View>
         ) : (currentChampionship?.matches?.length || 0) === 0 ? (
@@ -842,9 +837,7 @@ const PlayerDetailsModal = ({
     >
       <View style={modalStyles.overlay}>
         <View style={modalStyles.modal}>
-          <Text style={modalStyles.title}>
-            Detalhes - {playerName}
-          </Text>
+          <Text style={modalStyles.title}>Detalhes - {playerName}</Text>
 
           <View style={modalStyles.section}>
             <Text style={modalStyles.label}>Quantidade de Gols:</Text>
