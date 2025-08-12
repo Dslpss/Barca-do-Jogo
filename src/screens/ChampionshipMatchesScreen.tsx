@@ -429,8 +429,8 @@ const ChampionshipMatchesScreen = () => {
                   {isSelected && playerScorer && (
                     <Text style={{ fontSize: 10 }}>
                       {"\n"}⚽{playerScorer.goals}
-                      {playerScorer.yellowCard && " 🟨"}
-                      {playerScorer.redCard && " 🟥"}
+                      <Text>{playerScorer.yellowCard ? " 🟨" : ""}</Text>
+                      <Text>{playerScorer.redCard ? " 🟥" : ""}</Text>
                     </Text>
                   )}
                 </Text>

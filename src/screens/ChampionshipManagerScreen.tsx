@@ -325,7 +325,7 @@ const ChampionshipManagerScreen = () => {
             />
             <Text style={styles.championshipName}>
               {item.name}
-              {hasEmptyId && " ⚠️"}
+              <Text>{hasEmptyId ? " ⚠️" : ""}</Text>
             </Text>
           </View>
           <View style={styles.statusGroup}>
@@ -376,7 +376,8 @@ const ChampionshipManagerScreen = () => {
               style={{ marginRight: 6 }}
             />
             <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Times: </Text>{item.teams?.length || 0}
+              <Text style={styles.infoLabel}>Times: </Text>
+              <Text>{item.teams?.length || 0}</Text>
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -388,7 +389,7 @@ const ChampionshipManagerScreen = () => {
             />
             <Text style={styles.infoText}>
               <Text style={styles.infoLabel}>Jogos: </Text>
-              {item.matches?.length || 0}
+              <Text>{item.matches?.length || 0}</Text>
             </Text>
           </View>
         </View>
