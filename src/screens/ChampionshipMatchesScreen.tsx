@@ -75,7 +75,10 @@ const ChampionshipMatchesScreen = () => {
   }, [isFocused]);
 
   const handleGenerateMatches = async () => {
-    if (!currentChampionship) return;
+    if (!currentChampionship) {
+      Alert.alert("Erro", "Nenhum campeonato selecionado");
+      return;
+    }
 
     if ((currentChampionship.teams?.length || 0) < 2) {
       Alert.alert(
@@ -85,8 +88,50 @@ const ChampionshipMatchesScreen = () => {
       return;
     }
 
-    // Abrir modal de configuração ao invés de gerar diretamente
-    setShowMatchGenerationModal(true);
+    // Perguntar ao usuário se deseja gerar todas as partidas automaticamente
+    Alert.alert(
+      "Gerar Partidas",
+      `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${currentChampionship.teams.length * (currentChampionship.teams.length - 1)} partidas (ida e volta).`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Gerar",
+          onPress: async () => {
+            try {
+              // Criar automaticamente todos os confrontos possíveis (ida e volta)
+              const teams = currentChampionship.teams;
+              const manualMatches: ManualMatch[] = [];
+              
+              // Gerar confrontos de ida e volta
+              for (let round = 1; round <= 2; round++) {
+                for (let i = 0; i < teams.length; i++) {
+                  for (let j = 0; j < teams.length; j++) {
+                    if (i !== j) {
+                      manualMatches.push({
+                        homeTeamId: teams[i].id,
+                        awayTeamId: teams[j].id,
+                        round: round,
+                      });
+                    }
+                  }
+                }
+              }
+
+              const options: MatchGenerationOptions = {
+                type: "manual",
+                manualMatches: manualMatches,
+              };
+
+              await generateMatches(options);
+              Alert.alert("Sucesso", `${manualMatches.length} partidas geradas com sucesso!`);
+            } catch (error) {
+              console.error("Erro ao gerar partidas:", error);
+              Alert.alert("Erro", "Erro ao gerar partidas. Tente novamente.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleConfirmGeneration = async () => {
