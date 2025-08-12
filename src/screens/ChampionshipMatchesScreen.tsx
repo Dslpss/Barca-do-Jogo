@@ -843,8 +843,7 @@ const PlayerDetailsModal = ({
       <View style={modalStyles.overlay}>
         <View style={modalStyles.modal}>
           <Text style={modalStyles.title}>
-            <Text>Detalhes - </Text>
-            <Text>{playerName}</Text>
+            Detalhes - {playerName}
           </Text>
 
           <View style={modalStyles.section}>
