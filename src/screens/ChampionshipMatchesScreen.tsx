@@ -89,12 +89,12 @@ const ChampionshipMatchesScreen = () => {
     }
 
     // Perguntar ao usuário se deseja gerar todas as partidas automaticamente
+    const teamsCount = currentChampionship.teams?.length || 0;
+    const totalMatches = teamsCount * (teamsCount - 1);
+    
     Alert.alert(
       "Gerar Partidas",
-      `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${
-        currentChampionship.teams.length *
-        (currentChampionship.teams.length - 1)
-      } partidas (ida e volta).`,
+      `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${totalMatches} partidas (ida e volta).`,
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -957,7 +957,7 @@ const MatchGenerationModal = ({
                   >
                     {customMatchForm.homeTeam
                       ? teams.find((t) => t.id === customMatchForm.homeTeam)
-                          ?.name
+                          ?.name || "Time não encontrado"
                       : "Selecionar"}
                   </Text>
                 </TouchableOpacity>
@@ -1001,7 +1001,7 @@ const MatchGenerationModal = ({
                   >
                     {customMatchForm.awayTeam
                       ? teams.find((t) => t.id === customMatchForm.awayTeam)
-                          ?.name
+                          ?.name || "Time não encontrado"
                       : "Selecionar"}
                   </Text>
                 </TouchableOpacity>
@@ -1035,7 +1035,7 @@ const MatchGenerationModal = ({
                 return (
                   <View key={index} style={modalStyles.selectedMatchItem}>
                     <Text style={modalStyles.selectedMatchText}>
-                      {homeTeam?.name} vs {awayTeam?.name}
+                      {homeTeam?.name || "Time não encontrado"} vs {awayTeam?.name || "Time não encontrado"}
                     </Text>
                     <TouchableOpacity
                       style={modalStyles.removeMatchButton}
@@ -1087,7 +1087,7 @@ const MatchGenerationModal = ({
                         modalStyles.availableMatchTextDisabled,
                     ]}
                   >
-                    {matchup.homeTeam.name} vs {matchup.awayTeam.name}
+                    {matchup.homeTeam?.name || "Time"} vs {matchup.awayTeam?.name || "Time"}
                   </Text>
                 </TouchableOpacity>
               );
