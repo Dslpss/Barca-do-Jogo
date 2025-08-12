@@ -9,6 +9,8 @@ import {
   TextInput,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
@@ -313,84 +315,98 @@ const ChampionshipPlayersScreen = () => {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Adicionar Jogador</Text>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            contentContainerStyle={styles.modalScrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Adicionar Jogador</Text>
 
-            <TextInput
-              style={[styles.input, { color: "#000000" }]}
-              placeholder="Nome do jogador"
-              value={playerName}
-              onChangeText={setPlayerName}
-              placeholderTextColor="#666666"
-              selectionColor={theme.colors.primary}
-            />
+              <TextInput
+                style={[styles.input, { color: "#000000" }]}
+                placeholder="Nome do jogador"
+                value={playerName}
+                onChangeText={setPlayerName}
+                placeholderTextColor="#666666"
+                selectionColor={theme.colors.primary}
+              />
 
-            <TextInput
-              style={[styles.input, { color: "#000000" }]}
-              placeholder="CPF (opcional)"
-              value={playerCpf}
-              onChangeText={handleCPFChange}
-              placeholderTextColor="#666666"
-              selectionColor={theme.colors.primary}
-              keyboardType="numeric"
-              maxLength={14} // Permite formatação XXX.XXX.XXX-XX
-            />
+              <TextInput
+                style={[styles.input, { color: "#000000" }]}
+                placeholder="CPF (opcional)"
+                value={playerCpf}
+                onChangeText={handleCPFChange}
+                placeholderTextColor="#666666"
+                selectionColor={theme.colors.primary}
+                keyboardType="numeric"
+                maxLength={14} // Permite formatação XXX.XXX.XXX-XX
+              />
 
-            <Text style={styles.positionLabel}>Posição:</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.positionOptions}
-            >
-              {POSITIONS.map((position) => (
-                <TouchableOpacity
-                  key={position}
-                  style={[
-                    styles.positionOption,
-                    playerPosition === position &&
-                      styles.selectedPositionOption,
-                  ]}
-                  onPress={() => setPlayerPosition(position)}
-                >
-                  <Text
-                    style={[
-                      styles.positionOptionText,
-                      playerPosition === position &&
-                        styles.selectedPositionOptionText,
-                    ]}
-                  >
-                    {position}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {renderStars(playerSkill, setPlayerSkill)}
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowAddModal(false);
-                  setPlayerName("");
-                  setPlayerSkill(3);
-                  setPlayerPosition("Qualquer");
-                  setPlayerCpf("");
-                  setSelectedTeamId("");
+              <Text style={styles.positionLabel}>Posição:</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.positionOptions}
+                contentContainerStyle={{
+                  paddingHorizontal: 15,
+                  alignItems: "center",
+                  paddingVertical: 10,
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleAddPlayer}
-              >
-                <Text style={styles.confirmButtonText}>Adicionar</Text>
-              </TouchableOpacity>
+                {POSITIONS.map((position) => (
+                  <TouchableOpacity
+                    key={position}
+                    style={[
+                      styles.positionOption,
+                      playerPosition === position &&
+                        styles.selectedPositionOption,
+                    ]}
+                    onPress={() => setPlayerPosition(position)}
+                  >
+                    <Text
+                      style={[
+                        styles.positionOptionText,
+                        playerPosition === position &&
+                          styles.selectedPositionOptionText,
+                      ]}
+                    >
+                      {position}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {renderStars(playerSkill, setPlayerSkill)}
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowAddModal(false);
+                    setPlayerName("");
+                    setPlayerSkill(3);
+                    setPlayerPosition("Qualquer");
+                    setPlayerCpf("");
+                    setSelectedTeamId("");
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleAddPlayer}
+                >
+                  <Text style={styles.confirmButtonText}>Adicionar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -580,16 +596,19 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalScrollContainer: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   modalContent: {
     backgroundColor: theme.colors.card,
     borderRadius: theme.spacing.md,
     padding: theme.spacing.lg,
-    width: "90%",
+    width: "100%",
     maxWidth: 400,
-    maxHeight: "80%",
   },
   modalTitle: {
     ...theme.typography.h2,
@@ -602,32 +621,54 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   positionLabel: {
-    ...theme.typography.label,
+    fontSize: 16,
+    fontWeight: "600",
     color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
+    marginBottom: 12,
+    marginLeft: 2,
   },
   positionOptions: {
     marginBottom: theme.spacing.md,
+    height: 70,
   },
   positionOption: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
-    marginRight: theme.spacing.sm,
+    backgroundColor: "#ffffff",
+    borderWidth: 2,
+    borderColor: "#e8ecf4",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    marginRight: 12,
+    minWidth: 100,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   selectedPositionOption: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
+    transform: [{ scale: 1.05 }],
+    elevation: 5,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   positionOptionText: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4a5568",
+    textAlign: "center",
+    letterSpacing: 0.3,
   },
   selectedPositionOptionText: {
     color: theme.colors.white,
+    fontWeight: "700",
   },
   starsContainer: {
     marginBottom: theme.spacing.lg,
