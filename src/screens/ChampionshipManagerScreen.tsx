@@ -398,7 +398,8 @@ const ChampionshipManagerScreen = () => {
         </View>
 
         <Text style={styles.dateText}>
-          Criado em: {(() => {
+          Criado em:{" "}
+          {(() => {
             try {
               const date = new Date(item.createdAt);
               if (isNaN(date.getTime())) {

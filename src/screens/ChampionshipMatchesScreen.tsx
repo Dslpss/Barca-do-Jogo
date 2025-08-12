@@ -456,7 +456,9 @@ const ChampionshipMatchesScreen = () => {
                 return player ? (
                   <Text key={scorer.playerId}>
                     {index > 0 && ", "}
-                    {player.name} ({scorer.goals}⚽{scorer.yellowCard ? "🟨" : ""}{scorer.redCard ? "🟥" : ""})
+                    {player.name} ({scorer.goals}⚽
+                    {scorer.yellowCard ? "🟨" : ""}
+                    {scorer.redCard ? "🟥" : ""})
                   </Text>
                 ) : null;
               })
@@ -518,7 +520,8 @@ const ChampionshipMatchesScreen = () => {
         {match.played ? (
           <View style={styles.playedMatchInfo}>
             <Text style={styles.playedText}>
-              Partida finalizada em {match.date
+              Partida finalizada em{" "}
+              {match.date
                 ? new Date(match.date).toLocaleDateString("pt-BR")
                 : "Data não informada"}
             </Text>
@@ -626,9 +629,7 @@ const ChampionshipMatchesScreen = () => {
       >
         {rounds.map((round) => (
           <View key={round} style={styles.roundContainer}>
-            <Text style={styles.roundTitle}>
-              🏁 Rodada {round}
-            </Text>
+            <Text style={styles.roundTitle}>🏁 Rodada {round}</Text>
             {matchesByRound[parseInt(round)].map((match) => (
               <View key={match.id} style={styles.matchInRound}>
                 {renderMatchItem({ item: match })}
@@ -713,7 +714,8 @@ const ChampionshipMatchesScreen = () => {
               <Text style={styles.progressPercentage}>
                 {totalMatches > 0
                   ? Math.round((playedMatches / totalMatches) * 100)
-                  : 0}%
+                  : 0}
+                %
               </Text>
             </View>
           </View>
