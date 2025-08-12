@@ -91,7 +91,10 @@ const ChampionshipMatchesScreen = () => {
     // Perguntar ao usuário se deseja gerar todas as partidas automaticamente
     Alert.alert(
       "Gerar Partidas",
-      `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${currentChampionship.teams.length * (currentChampionship.teams.length - 1)} partidas (ida e volta).`,
+      `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${
+        currentChampionship.teams.length *
+        (currentChampionship.teams.length - 1)
+      } partidas (ida e volta).`,
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -101,7 +104,7 @@ const ChampionshipMatchesScreen = () => {
               // Criar automaticamente todos os confrontos possíveis (ida e volta)
               const teams = currentChampionship.teams;
               const manualMatches: ManualMatch[] = [];
-              
+
               // Gerar confrontos de ida e volta
               for (let round = 1; round <= 2; round++) {
                 for (let i = 0; i < teams.length; i++) {
@@ -123,13 +126,16 @@ const ChampionshipMatchesScreen = () => {
               };
 
               await generateMatches(options);
-              Alert.alert("Sucesso", `${manualMatches.length} partidas geradas com sucesso!`);
+              Alert.alert(
+                "Sucesso",
+                `${manualMatches.length} partidas geradas com sucesso!`
+              );
             } catch (error) {
               console.error("Erro ao gerar partidas:", error);
               Alert.alert("Erro", "Erro ao gerar partidas. Tente novamente.");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
