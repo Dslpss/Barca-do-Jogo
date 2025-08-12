@@ -433,8 +433,8 @@ const ChampionshipMatchesScreen = () => {
                   {isSelected && playerScorer && (
                     <Text style={{ fontSize: 10 }}>
                       {"\n"}⚽{playerScorer.goals}
-                      <Text>{playerScorer.yellowCard ? " 🟨" : ""}</Text>
-                      <Text>{playerScorer.redCard ? " 🟥" : ""}</Text>
+                      {playerScorer.yellowCard ? " 🟨" : ""}
+                      {playerScorer.redCard ? " 🟥" : ""}
                     </Text>
                   )}
                 </Text>
@@ -700,8 +700,7 @@ const ChampionshipMatchesScreen = () => {
               <Text style={styles.progressPercentage}>
                 {totalMatches > 0
                   ? Math.round((playedMatches / totalMatches) * 100)
-                  : 0}
-                %
+                  : 0}%
               </Text>
             </View>
           </View>
