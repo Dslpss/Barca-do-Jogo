@@ -325,7 +325,7 @@ const ChampionshipManagerScreen = () => {
             />
             <Text style={styles.championshipName}>
               {item.name}
-              <Text>{hasEmptyId ? " ⚠️" : ""}</Text>
+              {hasEmptyId ? " ⚠️" : ""}
             </Text>
           </View>
           <View style={styles.statusGroup}>
@@ -365,7 +365,10 @@ const ChampionshipManagerScreen = () => {
               style={{ marginRight: 6 }}
             />
             <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Tipo: {getTypeLabel(item.type)}</Text>
+              <Text style={styles.infoLabel}>
+                <Text>Tipo: </Text>
+                {getTypeLabel(item.type)}
+              </Text>
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -377,7 +380,7 @@ const ChampionshipManagerScreen = () => {
             />
             <Text style={styles.infoText}>
               <Text style={styles.infoLabel}>Times: </Text>
-              <Text>{item.teams?.length || 0}</Text>
+              {item.teams?.length || 0}
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -389,14 +392,13 @@ const ChampionshipManagerScreen = () => {
             />
             <Text style={styles.infoText}>
               <Text style={styles.infoLabel}>Jogos: </Text>
-              <Text>{item.matches?.length || 0}</Text>
+              {item.matches?.length || 0}
             </Text>
           </View>
         </View>
 
         <Text style={styles.dateText}>
-          Criado em:{" "}
-          {(() => {
+          Criado em: {(() => {
             try {
               const date = new Date(item.createdAt);
               if (isNaN(date.getTime())) {
@@ -505,7 +507,8 @@ const ChampionshipManagerScreen = () => {
               <Text style={styles.currentName}>{currentChampionship.name}</Text>
             </View>
             <Text style={styles.currentInfo}>
-              {getTypeLabel(currentChampionship.type)} •{" "}
+              {getTypeLabel(currentChampionship.type)}
+              <Text> • </Text>
               {getStatusLabel(currentChampionship.status)}
             </Text>
           </View>

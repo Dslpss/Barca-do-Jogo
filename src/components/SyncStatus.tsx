@@ -33,7 +33,7 @@ export default function SyncStatus({
   };
 
   const formatLastSync = () => {
-    if (!lastSync) return "";
+    if (!lastSync) return null;
     return `Última sync: ${lastSync.toLocaleTimeString()}`;
   };
 

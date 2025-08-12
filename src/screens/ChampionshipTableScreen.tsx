@@ -203,10 +203,7 @@ const ChampionshipTableScreen = () => {
         <Text style={styles.sectionTitle}>🥇 Artilheiros</Text>
         {topScorers.map((scorer, index) => (
           <View key={scorer.playerId} style={styles.scorerRow}>
-            <Text style={styles.scorerPosition}>
-              {index + 1}
-              {"°"}
-            </Text>
+            <Text style={styles.scorerPosition}>{index + 1}º</Text>
             <View style={styles.scorerInfo}>
               <Text style={styles.scorerName}>{scorer.playerName}</Text>
               <Text style={styles.scorerTeam}>{scorer.teamName}</Text>

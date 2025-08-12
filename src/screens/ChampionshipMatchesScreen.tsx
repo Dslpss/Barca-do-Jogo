@@ -400,7 +400,10 @@ const ChampionshipMatchesScreen = () => {
 
     return (
       <View style={styles.goalScorersSection}>
-        <Text style={styles.goalScorersTitle}>{teamData.name}:</Text>
+        <Text style={modalStyles.goalScorersTitle}>
+          <Text>{teamData.name}</Text>
+          <Text>:</Text>
+        </Text>
         <View style={styles.goalScorersGrid}>
           {teamData.players.map((player) => {
             const playerScorer = selectedScorers.find(
@@ -446,18 +449,18 @@ const ChampionshipMatchesScreen = () => {
           <Text style={styles.selectedScorersText}>
             Goleadores:{" "}
             {selectedScorers
-              .map((scorer) => {
+              .map((scorer, index) => {
                 const player = teamData.players.find(
                   (p) => p.id === scorer.playerId
                 );
-                return player
-                  ? `${player.name} (${scorer.goals}⚽${
-                      scorer.yellowCard ? " 🟨" : ""
-                    }${scorer.redCard ? " 🟥" : ""})`
-                  : null;
+                return player ? (
+                  <Text key={scorer.playerId}>
+                    {index > 0 && ", "}
+                    {player.name} ({scorer.goals}⚽{scorer.yellowCard ? "🟨" : ""}{scorer.redCard ? "🟥" : ""})
+                  </Text>
+                ) : null;
               })
-              .filter(Boolean)
-              .join(", ")}
+              .filter(Boolean)}
           </Text>
         )}
       </View>
@@ -475,7 +478,9 @@ const ChampionshipMatchesScreen = () => {
         <View style={styles.matchHeader}>
           <View style={styles.teamsContainer}>
             <View style={styles.teamContainer}>
-              <Text style={styles.teamName}>{homeTeam.name}</Text>
+              <Text style={styles.teamName}>
+                <Text>{homeTeam.name}</Text>
+              </Text>
               {homeTeam.color && (
                 <View
                   style={[
@@ -502,7 +507,9 @@ const ChampionshipMatchesScreen = () => {
           {match.played && (
             <View style={styles.resultBadge}>
               <Text style={styles.resultText}>
-                {match.homeScore} - {match.awayScore}
+                <Text>{match.homeScore}</Text>
+                <Text> - </Text>
+                <Text>{match.awayScore}</Text>
               </Text>
             </View>
           )}
@@ -511,8 +518,7 @@ const ChampionshipMatchesScreen = () => {
         {match.played ? (
           <View style={styles.playedMatchInfo}>
             <Text style={styles.playedText}>
-              Partida finalizada em{" "}
-              {match.date
+              Partida finalizada em {match.date
                 ? new Date(match.date).toLocaleDateString("pt-BR")
                 : "Data não informada"}
             </Text>
@@ -620,7 +626,9 @@ const ChampionshipMatchesScreen = () => {
       >
         {rounds.map((round) => (
           <View key={round} style={styles.roundContainer}>
-            <Text style={styles.roundTitle}>🏁 Rodada {round}</Text>
+            <Text style={styles.roundTitle}>
+              🏁 Rodada {round}
+            </Text>
             {matchesByRound[parseInt(round)].map((match) => (
               <View key={match.id} style={styles.matchInRound}>
                 {renderMatchItem({ item: match })}
@@ -679,7 +687,12 @@ const ChampionshipMatchesScreen = () => {
             <View style={styles.progressInfo}>
               <Text style={styles.progressLabel}>Progresso do Campeonato</Text>
               <Text style={styles.matchesProgress}>
-                {playedMatches} de {totalMatches} partidas realizadas
+                <Text style={styles.matchesInfo}>
+                  <Text>{playedMatches}</Text>
+                  <Text> de </Text>
+                  <Text>{currentChampionship?.matches?.length || 0}</Text>
+                  <Text> partidas realizadas</Text>
+                </Text>
               </Text>
             </View>
 
@@ -729,7 +742,9 @@ const ChampionshipMatchesScreen = () => {
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Adicione pelo menos 2 times</Text>
             <Text style={styles.emptySubtext}>
-              É necessário ter pelo menos 2 times para gerar partidas
+              <Text>
+                É necessário ter pelo menos 2 times para gerar partidas
+              </Text>
             </Text>
           </View>
         ) : (currentChampionship?.matches?.length || 0) === 0 ? (
@@ -825,7 +840,10 @@ const PlayerDetailsModal = ({
     >
       <View style={modalStyles.overlay}>
         <View style={modalStyles.modal}>
-          <Text style={modalStyles.title}>Detalhes - {playerName}</Text>
+          <Text style={modalStyles.title}>
+            <Text>Detalhes - </Text>
+            <Text>{playerName}</Text>
+          </Text>
 
           <View style={modalStyles.section}>
             <Text style={modalStyles.label}>Quantidade de Gols:</Text>
@@ -1387,6 +1405,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: theme.spacing.xs,
   },
+  matchesInfo: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    fontWeight: "500",
+  },
   matchForm: {
     gap: theme.spacing.md,
   },
@@ -1501,6 +1524,12 @@ const modalStyles = StyleSheet.create({
   },
   label: {
     ...theme.typography.body,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    fontWeight: "600",
+  },
+  goalScorersTitle: {
+    ...theme.typography.label,
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
     fontWeight: "600",
