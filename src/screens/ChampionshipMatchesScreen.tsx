@@ -400,7 +400,9 @@ const ChampionshipMatchesScreen = () => {
 
     return (
       <View style={styles.goalScorersSection}>
-        <Text style={modalStyles.goalScorersTitle}>{teamData.name}:</Text>
+        <Text style={modalStyles.goalScorersTitle}>
+          {teamData.name || "Time"}:
+        </Text>
         <View style={styles.goalScorersGrid}>
           {teamData.players.map((player) => {
             const playerScorer = selectedScorers.find(
@@ -429,11 +431,11 @@ const ChampionshipMatchesScreen = () => {
                     isSelected && styles.goalScorerButtonTextSelected,
                   ]}
                 >
-                  {player.name}
+                  {player.name || "Jogador"}
                   {isSelected && playerScorer && (
                     <Text style={{ fontSize: 10 }}>
                       {"\n⚽"}
-                      {playerScorer.goals}
+                      {String(playerScorer.goals ?? 0)}
                       {playerScorer.yellowCard ? " 🟨" : ""}
                       {playerScorer.redCard ? " 🟥" : ""}
                     </Text>
@@ -458,9 +460,9 @@ const ChampionshipMatchesScreen = () => {
                   (scorer.redCard ? "🟥" : "");
                 return (
                   prefix +
-                  player.name +
+                  (player.name || "Jogador") +
                   " (" +
-                  scorer.goals +
+                  (scorer.goals ?? 0) +
                   "⚽" +
                   cards +
                   ")"
@@ -486,7 +488,7 @@ const ChampionshipMatchesScreen = () => {
           <View style={styles.teamsContainer}>
             <View style={styles.teamContainer}>
               <Text style={styles.teamName}>{homeTeam.name || "Time"}</Text>
-              {homeTeam.color && (
+              {Boolean(homeTeam.color) && (
                 <View
                   style={[
                     styles.teamColorIndicator,
@@ -498,7 +500,7 @@ const ChampionshipMatchesScreen = () => {
             <Text style={styles.vsText}>vs</Text>
             <View style={styles.teamContainer}>
               <Text style={styles.teamName}>{awayTeam.name || "Time"}</Text>
-              {awayTeam.color && (
+              {Boolean(awayTeam.color) && (
                 <View
                   style={[
                     styles.teamColorIndicator,
@@ -512,7 +514,7 @@ const ChampionshipMatchesScreen = () => {
           {match.played && (
             <View style={styles.resultBadge}>
               <Text style={styles.resultText}>
-                {match.homeScore ?? 0} - {match.awayScore ?? 0}
+                {String(match.homeScore ?? 0)} - {String(match.awayScore ?? 0)}
               </Text>
             </View>
           )}
@@ -526,8 +528,9 @@ const ChampionshipMatchesScreen = () => {
                 ? new Date(match.date).toLocaleDateString("pt-BR")
                 : "Data não informada"}
             </Text>
-            {(match.homeGoalScorers?.length ||
-              match.awayGoalScorers?.length) && (
+            {(match.homeGoalScorers?.length ?? 0) +
+              (match.awayGoalScorers?.length ?? 0) >
+              0 && (
               <View style={styles.goalScorersInfo}>
                 {match.homeGoalScorers && match.homeGoalScorers.length > 0 && (
                   <Text style={styles.goalScorersInfoText}>
@@ -538,9 +541,11 @@ const ChampionshipMatchesScreen = () => {
                           (p) => p.id === scorer.playerId
                         );
                         return player
-                          ? `${player.name} (${scorer.goals}⚽${
-                              scorer.yellowCard ? " 🟨" : ""
-                            }${scorer.redCard ? " 🟥" : ""})`
+                          ? `${player.name || "Jogador"} (${String(
+                              scorer.goals ?? 0
+                            )}⚽${scorer.yellowCard ? " 🟨" : ""}${
+                              scorer.redCard ? " 🟥" : ""
+                            })`
                           : "";
                       })
                       .filter(Boolean)
@@ -556,9 +561,11 @@ const ChampionshipMatchesScreen = () => {
                           (p) => p.id === scorer.playerId
                         );
                         return player
-                          ? `${player.name} (${scorer.goals}⚽${
-                              scorer.yellowCard ? " 🟨" : ""
-                            }${scorer.redCard ? " 🟥" : ""})`
+                          ? `${player.name || "Jogador"} (${String(
+                              scorer.goals ?? 0
+                            )}⚽${scorer.yellowCard ? " 🟨" : ""}${
+                              scorer.redCard ? " 🟥" : ""
+                            })`
                           : "";
                       })
                       .filter(Boolean)
@@ -677,7 +684,7 @@ const ChampionshipMatchesScreen = () => {
             <View style={styles.championshipTitleContainer}>
               <Text style={styles.championshipIcon}>🏆</Text>
               <Text style={styles.championshipName}>
-                {currentChampionship.name}
+                {currentChampionship.name || "Campeonato"}
               </Text>
             </View>
             <View style={styles.championshipBadge}>
@@ -689,8 +696,9 @@ const ChampionshipMatchesScreen = () => {
             <View style={styles.progressInfo}>
               <Text style={styles.progressLabel}>Progresso do Campeonato</Text>
               <Text style={styles.matchesProgress}>
-                {playedMatches} de {currentChampionship?.matches?.length || 0}{" "}
-                partidas realizadas
+                {String(playedMatches)} de{" "}
+                {String(currentChampionship?.matches?.length || 0)} partidas
+                realizadas
               </Text>
             </View>
 
@@ -720,18 +728,18 @@ const ChampionshipMatchesScreen = () => {
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>
-                {currentChampionship.teams?.length || 0}
+                {String(currentChampionship.teams?.length || 0)}
               </Text>
               <Text style={styles.statLabel}>Times</Text>
             </View>
             <View style={styles.statSeparator} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{totalMatches}</Text>
+              <Text style={styles.statNumber}>{String(totalMatches)}</Text>
               <Text style={styles.statLabel}>Partidas</Text>
             </View>
             <View style={styles.statSeparator} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{playedMatches}</Text>
+              <Text style={styles.statNumber}>{String(playedMatches)}</Text>
               <Text style={styles.statLabel}>Finalizadas</Text>
             </View>
           </View>
@@ -1034,7 +1042,7 @@ const MatchGenerationModal = ({
           </View>
 
           <Text style={modalStyles.label}>
-            Confrontos Selecionados ({selectedManualMatches.length}):
+            Confrontos Selecionados ({String(selectedManualMatches.length)}):
           </Text>
 
           {selectedManualMatches.length > 0 && (
@@ -1125,7 +1133,7 @@ const MatchGenerationModal = ({
               onPress={onConfirm}
             >
               <Text style={modalStyles.saveButtonText}>
-                Gerar ({selectedManualMatches.length} partidas)
+                Gerar ({String(selectedManualMatches.length)} partidas)
               </Text>
             </TouchableOpacity>
           </View>
