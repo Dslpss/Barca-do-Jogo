@@ -697,7 +697,7 @@ const ChampionshipMatchesScreen = () => {
                 {totalMatches > 0
                   ? Math.round((playedMatches / totalMatches) * 100)
                   : 0}
-                %
+                {"%"}
               </Text>
             </View>
           </View>
