@@ -91,14 +91,18 @@ const ChampionshipMatchesScreen = () => {
     // Perguntar ao usuário se deseja gerar todas as partidas automaticamente
     const teamsCount = currentChampionship.teams?.length || 0;
     const totalMatches = teamsCount * (teamsCount - 1);
-    
+
     Alert.alert(
       "Gerar Partidas",
       `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${totalMatches} partidas (ida e volta).`,
       [
         { text: "Cancelar", style: "cancel" },
         {
-          text: "Gerar",
+          text: "Seleção Manual",
+          onPress: () => setShowMatchGenerationModal(true),
+        },
+        {
+          text: "Gerar Todas",
           onPress: async () => {
             try {
               // Criar automaticamente todos os confrontos possíveis (ida e volta)
@@ -697,7 +701,7 @@ const ChampionshipMatchesScreen = () => {
                 {totalMatches > 0
                   ? Math.round((playedMatches / totalMatches) * 100)
                   : 0}
-                {"%"}
+                %
               </Text>
             </View>
           </View>
@@ -1035,7 +1039,8 @@ const MatchGenerationModal = ({
                 return (
                   <View key={index} style={modalStyles.selectedMatchItem}>
                     <Text style={modalStyles.selectedMatchText}>
-                      {homeTeam?.name || "Time não encontrado"} vs {awayTeam?.name || "Time não encontrado"}
+                      {homeTeam?.name || "Time não encontrado"} vs{" "}
+                      {awayTeam?.name || "Time não encontrado"}
                     </Text>
                     <TouchableOpacity
                       style={modalStyles.removeMatchButton}
@@ -1087,7 +1092,8 @@ const MatchGenerationModal = ({
                         modalStyles.availableMatchTextDisabled,
                     ]}
                   >
-                    {matchup.homeTeam?.name || "Time"} vs {matchup.awayTeam?.name || "Time"}
+                    {matchup.homeTeam?.name || "Time"} vs{" "}
+                    {matchup.awayTeam?.name || "Time"}
                   </Text>
                 </TouchableOpacity>
               );
