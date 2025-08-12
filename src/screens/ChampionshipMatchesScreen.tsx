@@ -485,7 +485,7 @@ const ChampionshipMatchesScreen = () => {
         <View style={styles.matchHeader}>
           <View style={styles.teamsContainer}>
             <View style={styles.teamContainer}>
-              <Text style={styles.teamName}>{homeTeam.name}</Text>
+              <Text style={styles.teamName}>{homeTeam.name || "Time"}</Text>
               {homeTeam.color && (
                 <View
                   style={[
@@ -497,7 +497,7 @@ const ChampionshipMatchesScreen = () => {
             </View>
             <Text style={styles.vsText}>vs</Text>
             <View style={styles.teamContainer}>
-              <Text style={styles.teamName}>{awayTeam.name}</Text>
+              <Text style={styles.teamName}>{awayTeam.name || "Time"}</Text>
               {awayTeam.color && (
                 <View
                   style={[
@@ -531,7 +531,7 @@ const ChampionshipMatchesScreen = () => {
               <View style={styles.goalScorersInfo}>
                 {match.homeGoalScorers && match.homeGoalScorers.length > 0 && (
                   <Text style={styles.goalScorersInfoText}>
-                    ⚽ {homeTeam.name}:{" "}
+                    ⚽ {homeTeam.name || "Time"}:{" "}
                     {match.homeGoalScorers
                       .map((scorer) => {
                         const player = homeTeam.players.find(
@@ -549,7 +549,7 @@ const ChampionshipMatchesScreen = () => {
                 )}
                 {match.awayGoalScorers && match.awayGoalScorers.length > 0 && (
                   <Text style={styles.goalScorersInfoText}>
-                    ⚽ {awayTeam.name}:{" "}
+                    ⚽ {awayTeam.name || "Time"}:{" "}
                     {match.awayGoalScorers
                       .map((scorer) => {
                         const player = awayTeam.players.find(
