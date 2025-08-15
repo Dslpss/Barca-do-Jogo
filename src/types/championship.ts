@@ -15,6 +15,14 @@ export interface Team {
   name: string;
   color: string;
   players: Player[];
+  eliminated?: boolean; // Para campeonatos mata-mata
+  eliminatedInRound?: number; // Em qual rodada foi eliminado
+}
+
+export interface Group {
+  id: string;
+  name: string; // Ex: "Grupo A", "Grupo B"
+  teamIds: string[];
 }
 
 export interface GoalScorer {
@@ -36,11 +44,20 @@ export interface Match {
   awayGoalScorers?: GoalScorer[]; // Detailed goal and card info
   round?: number; // Rodada/Dia do jogo
   matchOrder?: number; // Ordem do jogo na rodada
+  isKnockout?: boolean; // Indica se é uma partida de mata-mata
+  knockoutRound?: number; // Rodada do mata-mata
 }
 
 export interface MatchGenerationOptions {
-  type: "manual";
-  manualMatches: ManualMatch[]; // Confrontos selecionados manualmente (obrigatório)
+  type: "manual" | "configured";
+  manualMatches?: ManualMatch[]; // Confrontos selecionados manualmente (opcional)
+  configuredOptions?: ConfiguredMatchOptions; // Configurações de geração (opcional)
+}
+
+export interface ConfiguredMatchOptions {
+  totalRounds: number; // Número total de rodadas
+  matchesPerTeam: number; // Número de partidas que cada time vai jogar
+  matchDistribution: "equal" | "custom"; // Distribuição igual ou personalizada
 }
 
 export interface ManualMatch {
@@ -56,7 +73,12 @@ export interface Championship {
   status: "criado" | "em_andamento" | "pausado" | "finalizado";
   teams: Team[];
   matches: Match[];
+  groups?: Group[]; // Grupos para campeonatos por fase de grupos
+  currentPhase?: "grupos" | "mata_mata"; // Fase atual do campeonato (para tipo "grupos")
   matchGenerationOptions?: MatchGenerationOptions; // Opções de geração de partidas
+  groupStageSettings?: {
+    hasReturnMatches: boolean; // Se terá jogos de ida e volta na fase de grupos
+  };
   createdAt: string;
   updatedAt: string;
   finishedAt?: string; // Data de finalização do campeonato

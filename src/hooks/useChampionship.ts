@@ -685,6 +685,26 @@ export const useChampionship = () => {
     }
   };
 
+  // Resetar sorteios (apenas para campeonatos por grupos)
+  const resetGroupDraws = async () => {
+    if (!user) return;
+    if (!currentChampionship) throw new Error("Nenhum campeonato selecionado");
+
+    setLoading(true);
+    try {
+      await ChampionshipService.resetGroupDraws(currentChampionship.id);
+      await loadCurrentChampionship();
+      setError(null);
+      console.log("✅ Hook: Sorteios resetados com sucesso!");
+    } catch (err) {
+      setError("Erro ao resetar sorteios");
+      console.error(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Limpar todos os dados do usuário
   const clearAllData = async () => {
     if (!user) return;
@@ -699,6 +719,21 @@ export const useChampionship = () => {
       console.log("✅ Hook: Todos os dados foram limpos!");
     } catch (err) {
       setError("Erro ao limpar dados");
+      console.error(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Atualizar campeonato
+  const updateChampionship = async (championship: Championship) => {
+    setLoading(true);
+    try {
+      await ChampionshipService.updateChampionship(championship);
+      setError(null);
+    } catch (err) {
+      setError("Erro ao atualizar campeonato");
       console.error(err);
       throw err;
     } finally {
@@ -738,7 +773,9 @@ export const useChampionship = () => {
     finishChampionship,
     deleteChampionship,
     repairChampionships,
+    resetGroupDraws,
     syncData,
     clearAllData,
+    updateChampionship,
   };
 };

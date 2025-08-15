@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
+import MatchGenerationConfig from "../components/MatchGenerationConfig";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
 import { ChampionshipService } from "../services/championshipService";
@@ -22,6 +23,8 @@ import {
   MatchGenerationOptions,
   ManualMatch,
   Championship,
+  ConfiguredMatchOptions,
+  Group,
 } from "../types/championship";
 
 const ChampionshipMatchesScreen = () => {
@@ -34,6 +37,8 @@ const ChampionshipMatchesScreen = () => {
     forceReloadCurrentChampionship,
     getPossibleMatchups,
     getMatchesByRound,
+    resetGroupDraws,
+    updateChampionship,
   } = useChampionship();
 
   const [matchScores, setMatchScores] = useState<{
@@ -55,6 +60,8 @@ const ChampionshipMatchesScreen = () => {
 
   // Novos estados para as funcionalidades avançadas
   const [showMatchGenerationModal, setShowMatchGenerationModal] =
+    useState(false);
+  const [showConfiguredGenerationModal, setShowConfiguredGenerationModal] =
     useState(false);
   const [selectedManualMatches, setSelectedManualMatches] = useState<
     ManualMatch[]
@@ -88,60 +95,266 @@ const ChampionshipMatchesScreen = () => {
       return;
     }
 
-    // Perguntar ao usuário se deseja gerar todas as partidas automaticamente
+    const championshipType = currentChampionship.type || "pontos_corridos";
     const teamsCount = currentChampionship.teams?.length || 0;
-    const totalMatches = teamsCount * (teamsCount - 1);
 
-    Alert.alert(
-      "Gerar Partidas",
-      `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${totalMatches} partidas (ida e volta).`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Seleção Manual",
-          onPress: () => setShowMatchGenerationModal(true),
-        },
-        {
-          text: "Gerar Todas",
-          onPress: async () => {
-            try {
-              // Criar automaticamente todos os confrontos possíveis (ida e volta)
-              const teams = currentChampionship.teams;
-              const manualMatches: ManualMatch[] = [];
+    console.log(`🏆 Tipo de campeonato detectado: ${championshipType}`);
 
-              // Gerar confrontos de ida e volta
-              for (let round = 1; round <= 2; round++) {
-                for (let i = 0; i < teams.length; i++) {
-                  for (let j = 0; j < teams.length; j++) {
-                    if (i !== j) {
-                      manualMatches.push({
-                        homeTeamId: teams[i].id,
-                        awayTeamId: teams[j].id,
-                        round: round,
-                      });
+    // ADAPTAR OPÇÕES BASEADO NO TIPO DE CAMPEONATO
+    switch (championshipType) {
+      case "pontos_corridos":
+        // PONTOS CORRIDOS: Configuração manual OU turno/returno automático
+        Alert.alert(
+          "🔄 Pontos Corridos",
+          `Campeonato de pontos corridos com ${teamsCount} times.\n\nEscolha como gerar as partidas:`,
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "⚙️ Configurar Rodadas",
+              onPress: () => setShowConfiguredGenerationModal(true),
+            },
+            {
+              text: "🇧🇷 Turno e Returno",
+              onPress: async () => {
+                try {
+                  console.log("🔄 Gerando turno e returno automático...");
+                  await generateMatches(); // Sem opções = automático
+                  Alert.alert(
+                    "Sucesso",
+                    "Turno e returno gerados com sucesso!"
+                  );
+                } catch (error) {
+                  console.error("Erro ao gerar pontos corridos:", error);
+                  Alert.alert(
+                    "Erro",
+                    "Erro ao gerar partidas. Tente novamente."
+                  );
+                }
+              },
+            },
+          ]
+        );
+        break;
+
+      case "grupos":
+        // FASE DE GRUPOS: Sorteio dos grupos + confrontos internos
+        Alert.alert(
+          "🏆 Fase de Grupos",
+          `Campeonato de grupos com ${teamsCount} times.\n\nOs times serão sorteados em grupos e jogarão entre si.\n\nEscolha o formato das partidas:`,
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "🔄 Ida e Volta",
+              onPress: async () => {
+                try {
+                  console.log("🏆 Gerando fase de grupos com ida e volta...");
+                  
+                  // Configurar ida e volta
+                  if (currentChampionship) {
+                    currentChampionship.groupStageSettings = {
+                      hasReturnMatches: true
+                    };
+                    await updateChampionship(currentChampionship);
+                  }
+                  
+                  await generateMatches(); // Automático para grupos
+                  Alert.alert(
+                    "Sucesso",
+                    "Grupos sorteados e partidas de ida e volta geradas!"
+                  );
+                } catch (error) {
+                  console.error("Erro ao gerar grupos:", error);
+                  Alert.alert(
+                    "Erro",
+                    "Erro ao gerar partidas. Tente novamente."
+                  );
+                }
+              },
+            },
+            {
+              text: "➡️ Apenas Ida",
+              onPress: async () => {
+                try {
+                  console.log("🏆 Gerando fase de grupos apenas ida...");
+                  
+                  // Configurar apenas ida
+                  if (currentChampionship) {
+                    currentChampionship.groupStageSettings = {
+                      hasReturnMatches: false
+                    };
+                    await updateChampionship(currentChampionship);
+                  }
+                  
+                  await generateMatches(); // Automático para grupos
+                  Alert.alert(
+                    "Sucesso",
+                    "Grupos sorteados e partidas de ida geradas!"
+                  );
+                } catch (error) {
+                  console.error("Erro ao gerar grupos:", error);
+                  Alert.alert(
+                    "Erro",
+                    "Erro ao gerar partidas. Tente novamente."
+                  );
+                }
+              },
+            },
+          ]
+        );
+        break;
+
+      case "mata_mata":
+        // MATA-MATA: Detectar se é primeira fase ou próxima fase
+        const hasPlayedMatches =
+          (currentChampionship.matches?.filter((m) => m.played) || []).length >
+          0;
+        const existingMatches = currentChampionship.matches?.length || 0;
+        const hasKnockoutInProgress = hasPlayedMatches && existingMatches > 0;
+
+        if (hasKnockoutInProgress) {
+          // JÁ EXISTE MATA-MATA EM ANDAMENTO - GERAR PRÓXIMA FASE
+          console.log(
+            "🔄 Mata-mata em andamento detectado, tentando gerar próxima fase..."
+          );
+
+          Alert.alert(
+            "⚔️ Próxima Fase do Mata-Mata",
+            "Detectado mata-mata em andamento.\n\nDeseja gerar a próxima fase com os times classificados?",
+            [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "⚔️ Próxima Fase",
+                onPress: async () => {
+                  try {
+                    console.log("🔄 Gerando próxima fase do mata-mata...");
+
+                    // USAR O MÉTODO ESTÁTICO DA CLASSE IMPORTADA
+                    const { ChampionshipService } = await import(
+                      "../services/championshipService"
+                    );
+                    await ChampionshipService.checkAndGenerateNextKnockoutRound(
+                      currentChampionship.id
+                    );
+
+                    // Recarregar o campeonato para mostrar as novas partidas
+                    await forceReloadCurrentChampionship();
+
+                    Alert.alert(
+                      "Sucesso",
+                      "Próxima fase do mata-mata processada!\n\nVerifique as novas partidas ou se o campeonato foi finalizado."
+                    );
+                  } catch (error) {
+                    console.error("Erro ao gerar próxima fase:", error);
+                    Alert.alert(
+                      "Erro",
+                      "Erro ao gerar próxima fase. Verifique se todas as partidas da fase atual foram finalizadas."
+                    );
+                  }
+                },
+              },
+            ]
+          );
+        } else {
+          // PRIMEIRA FASE DO MATA-MATA
+          const drawType = hasPlayedMatches
+            ? "chaveamento por classificação"
+            : "sorteio aleatório";
+
+          Alert.alert(
+            "⚔️ Mata-Mata - Primeira Fase",
+            `Campeonato eliminatório com ${teamsCount} times.\n\nSerá usado ${drawType} para os confrontos iniciais.`,
+            [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "⚔️ Gerar Confrontos",
+                onPress: async () => {
+                  try {
+                    console.log("⚔️ Gerando primeira fase do mata-mata...");
+                    await generateMatches(); // Automático para mata-mata inicial
+                    Alert.alert(
+                      "Sucesso",
+                      `Primeira fase do mata-mata gerada!\n\nUsado: ${drawType}`
+                    );
+                  } catch (error) {
+                    console.error("Erro ao gerar mata-mata:", error);
+                    Alert.alert(
+                      "Erro",
+                      "Erro ao gerar partidas. Tente novamente."
+                    );
+                  }
+                },
+              },
+            ]
+          );
+        }
+        break;
+
+      default:
+        // FALLBACK: Opções genéricas (comportamento antigo)
+        console.log(
+          "⚠️ Tipo de campeonato não reconhecido, usando opções genéricas"
+        );
+        const totalMatches = teamsCount * (teamsCount - 1);
+
+        Alert.alert(
+          "Gerar Partidas",
+          `Deseja gerar automaticamente todas as partidas do campeonato?\n\nSerão criadas ${totalMatches} partidas (ida e volta).`,
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Configurar",
+              onPress: () => setShowConfiguredGenerationModal(true),
+            },
+            {
+              text: "Seleção Manual",
+              onPress: () => setShowMatchGenerationModal(true),
+            },
+            {
+              text: "Gerar Todas",
+              onPress: async () => {
+                try {
+                  // Criar automaticamente todos os confrontos possíveis (ida e volta)
+                  const teams = currentChampionship.teams;
+                  const manualMatches: ManualMatch[] = [];
+
+                  // Gerar confrontos de ida e volta
+                  for (let round = 1; round <= 2; round++) {
+                    for (let i = 0; i < teams.length; i++) {
+                      for (let j = 0; j < teams.length; j++) {
+                        if (i !== j) {
+                          manualMatches.push({
+                            homeTeamId: teams[i].id,
+                            awayTeamId: teams[j].id,
+                            round: round,
+                          });
+                        }
+                      }
                     }
                   }
+
+                  const options: MatchGenerationOptions = {
+                    type: "manual",
+                    manualMatches: manualMatches,
+                  };
+
+                  await generateMatches(options);
+                  Alert.alert(
+                    "Sucesso",
+                    `${manualMatches.length} partidas geradas com sucesso!`
+                  );
+                } catch (error) {
+                  console.error("Erro ao gerar partidas:", error);
+                  Alert.alert(
+                    "Erro",
+                    "Erro ao gerar partidas. Tente novamente."
+                  );
                 }
-              }
-
-              const options: MatchGenerationOptions = {
-                type: "manual",
-                manualMatches: manualMatches,
-              };
-
-              await generateMatches(options);
-              Alert.alert(
-                "Sucesso",
-                `${manualMatches.length} partidas geradas com sucesso!`
-              );
-            } catch (error) {
-              console.error("Erro ao gerar partidas:", error);
-              Alert.alert("Erro", "Erro ao gerar partidas. Tente novamente.");
-            }
-          },
-        },
-      ]
-    );
+              },
+            },
+          ]
+        );
+        break;
+    }
   };
 
   const handleConfirmGeneration = async () => {
@@ -164,6 +377,32 @@ const ChampionshipMatchesScreen = () => {
       Alert.alert("Sucesso", "Partidas geradas com sucesso!");
     } catch (error) {
       Alert.alert("Erro", "Erro ao gerar partidas");
+    }
+  };
+
+  const handleConfiguredGeneration = async (options: {
+    type: "configured";
+    configuredOptions: ConfiguredMatchOptions;
+    manualMatches: ManualMatch[];
+  }) => {
+    if (!currentChampionship) return;
+
+    try {
+      const generationOptions: MatchGenerationOptions = {
+        type: "configured",
+        manualMatches: options.manualMatches,
+        configuredOptions: options.configuredOptions,
+      };
+
+      await generateMatches(generationOptions);
+      setShowConfiguredGenerationModal(false);
+      Alert.alert(
+        "Sucesso",
+        `${options.manualMatches.length} partidas geradas com configuração personalizada!`
+      );
+    } catch (error) {
+      console.error("Erro ao gerar partidas configuradas:", error);
+      Alert.alert("Erro", "Erro ao gerar partidas. Tente novamente.");
     }
   };
 
@@ -224,6 +463,108 @@ const ChampionshipMatchesScreen = () => {
   const getMatchesByRoundForUI = () => {
     if (!currentChampionship) return {};
     return getMatchesByRound();
+  };
+
+  const handleResetDraws = async () => {
+    if (!currentChampionship) {
+      Alert.alert("Erro", "Nenhum campeonato selecionado");
+      return;
+    }
+
+    if (currentChampionship.type !== "grupos") {
+      Alert.alert(
+        "Erro",
+        "Esta função só está disponível para campeonatos por grupos"
+      );
+      return;
+    }
+
+    // Verificar se há algo para resetar
+    const hasGroups =
+      currentChampionship.groups && currentChampionship.groups.length > 0;
+    const hasMatches =
+      currentChampionship.matches && currentChampionship.matches.length > 0;
+
+    if (!hasGroups && !hasMatches) {
+      Alert.alert(
+        "Nada para resetar",
+        "Não há sorteios ou partidas para resetar"
+      );
+      return;
+    }
+
+    Alert.alert(
+      "🔄 Resetar Sorteios",
+      "Tem certeza que deseja resetar TODOS os sorteios?\n\n⚠️ Isso irá:\n• Apagar todos os grupos\n• Remover todas as partidas\n• Resetar o campeonato\n\nEsta ação não pode ser desfeita.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "🗑️ Resetar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await resetGroupDraws();
+              Alert.alert(
+                "Sucesso",
+                "Sorteios resetados com sucesso!\n\nO campeonato foi resetado para o estado inicial. Agora você pode fazer novos sorteios."
+              );
+            } catch (error) {
+              console.error("❌ Erro ao resetar sorteios:", error);
+              Alert.alert("Erro", "Erro ao resetar sorteios. Tente novamente.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearResults = async () => {
+    if (!currentChampionship) {
+      Alert.alert("Erro", "Nenhum campeonato selecionado");
+      return;
+    }
+
+    // Verificar se há resultados para limpar
+    const hasResults =
+      currentChampionship.matches?.some((match) => match.played) || false;
+
+    if (!hasResults) {
+      Alert.alert("Info", "Não há resultados para limpar");
+      return;
+    }
+
+    Alert.alert(
+      "🧹 Limpar Resultados",
+      "Tem certeza que deseja limpar TODOS os resultados das partidas?\n\nEsta ação não pode ser desfeita.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "🗑️ Limpar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await ChampionshipService.clearAllMatchResults(
+                currentChampionship.id
+              );
+              await forceReloadCurrentChampionship();
+              Alert.alert(
+                "Sucesso",
+                "Todos os resultados foram limpos!\n\nO campeonato foi resetado para o estado inicial."
+              );
+            } catch (error) {
+              console.error("Erro ao limpar resultados:", error);
+              Alert.alert(
+                "Erro",
+                "Erro ao limpar resultados. Tente novamente."
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleRecordResult = async (match: Match) => {
@@ -616,6 +957,102 @@ const ChampionshipMatchesScreen = () => {
     );
   };
 
+  const renderMatchesByGroups = () => {
+    if (
+      !currentChampionship?.groups ||
+      currentChampionship.groups.length === 0
+    ) {
+      return renderMatchesByRounds();
+    }
+
+    const matches = currentChampionship.matches || [];
+    const groups = currentChampionship.groups;
+
+    // Separar partidas por grupos e mata-mata
+    const groupMatches: { [groupId: string]: Match[] } = {};
+    const knockoutMatches: Match[] = [];
+
+    // Inicializar grupos
+    groups.forEach((group) => {
+      groupMatches[group.id] = [];
+    });
+
+    // Classificar partidas
+    matches.forEach((match) => {
+      // Verificar se é partida de mata-mata usando a propriedade isKnockout
+      if (match.isKnockout) {
+        knockoutMatches.push(match);
+      } else {
+        // Verificar se é partida de grupo
+        let isGroupMatch = false;
+        for (const group of groups) {
+          if (ChampionshipService.isGroupStageMatch(match, [group])) {
+            groupMatches[group.id].push(match);
+            isGroupMatch = true;
+            break;
+          }
+        }
+        // Se não é mata-mata nem de grupo, adicionar ao mata-mata como fallback
+        if (!isGroupMatch) {
+          knockoutMatches.push(match);
+        }
+      }
+    });
+
+    return (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContainer}
+      >
+        {/* Fase atual */}
+        <View style={styles.phaseIndicator}>
+          <Text style={styles.phaseTitle}>
+            {currentChampionship.currentPhase === "mata_mata"
+              ? "🏆 Fase Mata-Mata"
+              : "👥 Fase de Grupos"}
+          </Text>
+        </View>
+
+        {/* Partidas da Fase de Grupos */}
+        {currentChampionship.currentPhase !== "mata_mata" &&
+          groups.map((group) => {
+            const groupMatchesList = groupMatches[group.id] || [];
+            if (groupMatchesList.length === 0) return null;
+
+            return (
+              <View key={group.id} style={styles.groupContainer}>
+                <Text style={styles.groupTitle}>🏟️ {group.name}</Text>
+                {groupMatchesList.map((match) => (
+                  <View key={match.id} style={styles.matchInGroup}>
+                    {renderMatchItem({ item: match })}
+                  </View>
+                ))}
+              </View>
+            );
+          })}
+
+        {/* Partidas do Mata-Mata */}
+        {knockoutMatches.length > 0 && (
+          <View style={styles.knockoutContainer}>
+            <Text style={styles.knockoutTitle}>⚔️ Mata-Mata</Text>
+            {knockoutMatches.map((match) => (
+              <View key={match.id} style={styles.matchInKnockout}>
+                {renderMatchItem({ item: match })}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Fallback para quando não há partidas */}
+        {matches.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>Nenhuma partida encontrada</Text>
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderMatchesByRounds = () => {
     const matchesByRound = getMatchesByRoundForUI();
     const rounds = Object.keys(matchesByRound).sort(
@@ -683,9 +1120,31 @@ const ChampionshipMatchesScreen = () => {
           <View style={styles.championshipHeader}>
             <View style={styles.championshipTitleContainer}>
               <Text style={styles.championshipIcon}>🏆</Text>
-              <Text style={styles.championshipName}>
-                {currentChampionship.name || "Campeonato"}
-              </Text>
+              <View style={styles.championshipTitleSection}>
+                <Text style={styles.championshipName}>
+                  {currentChampionship.name || "Campeonato"}
+                </Text>
+                <View style={styles.championshipTypeContainer}>
+                  <Text style={styles.championshipTypeIcon}>
+                    {currentChampionship.type === "pontos_corridos"
+                      ? "🔄"
+                      : currentChampionship.type === "grupos"
+                      ? "🏆"
+                      : currentChampionship.type === "mata_mata"
+                      ? "⚔️"
+                      : "🏟️"}
+                  </Text>
+                  <Text style={styles.championshipType}>
+                    {currentChampionship.type === "pontos_corridos"
+                      ? "Pontos Corridos"
+                      : currentChampionship.type === "grupos"
+                      ? "Fase de Grupos"
+                      : currentChampionship.type === "mata_mata"
+                      ? "Mata-Mata"
+                      : "Campeonato"}
+                  </Text>
+                </View>
+              </View>
             </View>
             <View style={styles.championshipBadge}>
               <Text style={styles.championshipBadgeText}>ATIVO</Text>
@@ -769,15 +1228,34 @@ const ChampionshipMatchesScreen = () => {
           <>
             <View style={styles.header}>
               <Text style={styles.sectionTitle}>Partidas</Text>
-              <TouchableOpacity
-                style={styles.regenerateButton}
-                onPress={handleGenerateMatches}
-              >
-                <Text style={styles.regenerateButtonText}>Regerar</Text>
-              </TouchableOpacity>
+              <View style={styles.headerButtons}>
+                {/* Botão de Resetar Sorteios - apenas para campeonatos por grupos */}
+                {currentChampionship.type === "grupos" && (
+                  <TouchableOpacity
+                    style={styles.resetButton}
+                    onPress={handleResetDraws}
+                  >
+                    <Text style={styles.resetButtonText}>🔄 Reset</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={handleClearResults}
+                >
+                  <Text style={styles.clearButtonText}>🧹 Limpar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.regenerateButton}
+                  onPress={handleGenerateMatches}
+                >
+                  <Text style={styles.regenerateButtonText}>Regerar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {renderMatchesByRounds()}
+            {currentChampionship.type === "grupos"
+              ? renderMatchesByGroups()
+              : renderMatchesByRounds()}
           </>
         )}
       </View>
@@ -806,6 +1284,14 @@ const ChampionshipMatchesScreen = () => {
           setShowMatchGenerationModal(false);
           setSelectedManualMatches([]);
         }}
+      />
+
+      {/* Modal de Configuração Personalizada de Geração */}
+      <MatchGenerationConfig
+        visible={showConfiguredGenerationModal}
+        teams={currentChampionship?.teams || []}
+        onGenerateMatches={handleConfiguredGeneration}
+        onClose={() => setShowConfiguredGenerationModal(false)}
       />
     </View>
   );
@@ -1200,11 +1686,29 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginRight: theme.spacing.sm,
   },
+  championshipTitleSection: {
+    flex: 1,
+  },
   championshipName: {
     ...theme.typography.h2,
     color: theme.colors.text,
     fontWeight: "bold",
-    flex: 1,
+    marginBottom: 4,
+  },
+  championshipTypeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  championshipTypeIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  championshipType: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   championshipBadge: {
     backgroundColor: theme.colors.success,
@@ -1334,6 +1838,34 @@ const styles = StyleSheet.create({
   regenerateButtonText: {
     ...theme.typography.button,
     color: theme.colors.white,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  clearButton: {
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.spacing.sm,
+    marginRight: theme.spacing.sm,
+  },
+  clearButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontSize: 12,
+  },
+  resetButton: {
+    backgroundColor: "#ff6b35",
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.spacing.sm,
+    marginRight: theme.spacing.sm,
+  },
+  resetButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontSize: 12,
   },
   listContainer: {
     paddingBottom: theme.spacing.lg,
@@ -1496,6 +2028,52 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   matchInRound: {
+    marginBottom: theme.spacing.sm,
+  },
+  phaseIndicator: {
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.lg,
+    alignItems: "center",
+  },
+  phaseTitle: {
+    ...theme.typography.h2,
+    color: "white",
+    fontWeight: "bold",
+  },
+  groupContainer: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+  },
+  groupTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.md,
+    fontWeight: "bold",
+  },
+  matchInGroup: {
+    marginBottom: theme.spacing.sm,
+  },
+  knockoutContainer: {
+    backgroundColor: "#fff3cd",
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: "#ff6b35",
+  },
+  knockoutTitle: {
+    ...theme.typography.h3,
+    color: "#ff6b35",
+    marginBottom: theme.spacing.md,
+    fontWeight: "bold",
+  },
+  matchInKnockout: {
     marginBottom: theme.spacing.sm,
   },
 });

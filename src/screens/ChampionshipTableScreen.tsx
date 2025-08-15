@@ -4,7 +4,8 @@ import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
-import { Team } from "../types/championship";
+import { Team, Group } from "../types/championship";
+import { ChampionshipService } from "../services/championshipService";
 
 interface TableRow {
   position: number;
@@ -171,6 +172,50 @@ const ChampionshipTableScreen = () => {
     </View>
   );
 
+  const renderGroupTable = (group: Group) => {
+    const groupStandings = ChampionshipService.getGroupStandings(
+      currentChampionship!
+    );
+    const groupData = groupStandings[group.id];
+
+    if (!groupData) return null;
+
+    // Criar dados da tabela do grupo
+    const groupTableData: TableRow[] = groupData.standings
+      .map((standing, index) => {
+        const team = currentChampionship!.teams.find(
+          (t) => t.id === standing.teamId
+        );
+        if (!team) return null;
+
+        return {
+          position: index + 1,
+          team,
+          matches: standing.matches,
+          wins: standing.wins,
+          draws: standing.draws,
+          losses: standing.losses,
+          goalsFor: standing.goalsFor,
+          goalsAgainst: standing.goalsAgainst,
+          goalDifference: standing.goalDifference,
+          points: standing.points,
+        };
+      })
+      .filter(Boolean) as TableRow[];
+
+    return (
+      <View style={styles.tableContainer}>
+        {renderTableHeader()}
+        <FlatList
+          data={groupTableData}
+          renderItem={renderTableRow}
+          keyExtractor={(item) => item.team.id}
+          scrollEnabled={false}
+        />
+      </View>
+    );
+  };
+
   const renderTopScorers = () => {
     const playerGoals: {
       playerId: string;
@@ -246,6 +291,54 @@ const ChampionshipTableScreen = () => {
               Registre os resultados das partidas para ver a classificação
             </Text>
           </View>
+        ) : currentChampionship.type === "grupos" &&
+          currentChampionship.groups &&
+          currentChampionship.groups.length > 0 ? (
+          <>
+            {/* Classificação por Grupos */}
+            {currentChampionship.groups.map((group) => (
+              <View key={group.id} style={styles.groupSection}>
+                <Text style={styles.groupTitle}>🏟️ {group.name}</Text>
+                {renderGroupTable(group)}
+              </View>
+            ))}
+
+            {/* Classificação Geral (se necessário) */}
+            {currentChampionship.currentPhase === "mata_mata" && (
+              <View style={styles.tableSection}>
+                <Text style={styles.sectionTitle}>🏆 Classificação Geral</Text>
+                <View style={styles.tableContainer}>
+                  {renderTableHeader()}
+                  <FlatList
+                    data={tableData}
+                    renderItem={renderTableRow}
+                    keyExtractor={(item) => item.team.id}
+                    scrollEnabled={false}
+                  />
+                </View>
+              </View>
+            )}
+
+            <View style={styles.legendContainer}>
+              <Text style={styles.legendTitle}>Legenda:</Text>
+              <View style={styles.legendRow}>
+                <Text style={styles.legendItem}>Pts = Pontos</Text>
+                <Text style={styles.legendItem}>J = Jogos</Text>
+                <Text style={styles.legendItem}>V = Vitórias</Text>
+              </View>
+              <View style={styles.legendRow}>
+                <Text style={styles.legendItem}>E = Empates</Text>
+                <Text style={styles.legendItem}>D = Derrotas</Text>
+                <Text style={styles.legendItem}>GP = Gols Pró</Text>
+              </View>
+              <View style={styles.legendRow}>
+                <Text style={styles.legendItem}>GC = Gols Contra</Text>
+                <Text style={styles.legendItem}>SG = Saldo de Gols</Text>
+              </View>
+            </View>
+
+            {renderTopScorers()}
+          </>
         ) : (
           <>
             <View style={styles.tableSection}>
@@ -352,6 +445,21 @@ const styles = StyleSheet.create({
     borderRadius: theme.spacing.sm,
     marginBottom: theme.spacing.md,
     overflow: "hidden",
+  },
+  groupSection: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+    overflow: "hidden",
+  },
+  groupTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.primary,
+    padding: theme.spacing.md,
+    backgroundColor: "white",
+    fontWeight: "bold",
   },
   sectionTitle: {
     ...theme.typography.h3,
