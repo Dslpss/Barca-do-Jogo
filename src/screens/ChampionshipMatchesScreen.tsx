@@ -471,14 +471,6 @@ const ChampionshipMatchesScreen = () => {
       return;
     }
 
-    if (currentChampionship.type !== "grupos") {
-      Alert.alert(
-        "Erro",
-        "Esta função só está disponível para campeonatos por grupos"
-      );
-      return;
-    }
-
     // Verificar se há algo para resetar
     const hasGroups =
       currentChampionship.groups && currentChampionship.groups.length > 0;
@@ -493,9 +485,21 @@ const ChampionshipMatchesScreen = () => {
       return;
     }
 
+    // Mensagem personalizada baseada no tipo de campeonato
+    let resetMessage = "";
+    if (currentChampionship.type === "grupos") {
+      resetMessage = "Tem certeza que deseja resetar TODOS os sorteios?\n\n⚠️ Isso irá:\n• Apagar todos os grupos\n• Remover todas as partidas\n• Resetar o campeonato\n\nEsta ação não pode ser desfeita.";
+    } else if (currentChampionship.type === "pontos_corridos") {
+      resetMessage = "Tem certeza que deseja resetar o campeonato?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar todas as configurações\n• Voltar ao estado inicial\n\nEsta ação não pode ser desfeita.";
+    } else if (currentChampionship.type === "mata_mata") {
+      resetMessage = "Tem certeza que deseja resetar o mata-mata?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar eliminações\n• Voltar ao estado inicial\n\nEsta ação não pode ser desfeita.";
+    } else {
+      resetMessage = "Tem certeza que deseja resetar o campeonato?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar todas as configurações\n\nEsta ação não pode ser desfeita.";
+    }
+
     Alert.alert(
-      "🔄 Resetar Sorteios",
-      "Tem certeza que deseja resetar TODOS os sorteios?\n\n⚠️ Isso irá:\n• Apagar todos os grupos\n• Remover todas as partidas\n• Resetar o campeonato\n\nEsta ação não pode ser desfeita.",
+      "🔄 Resetar Campeonato",
+      resetMessage,
       [
         {
           text: "Cancelar",
@@ -1229,15 +1233,13 @@ const ChampionshipMatchesScreen = () => {
             <View style={styles.header}>
               <Text style={styles.sectionTitle}>Partidas</Text>
               <View style={styles.headerButtons}>
-                {/* Botão de Resetar Sorteios - apenas para campeonatos por grupos */}
-                {currentChampionship.type === "grupos" && (
-                  <TouchableOpacity
-                    style={styles.resetButton}
-                    onPress={handleResetDraws}
-                  >
-                    <Text style={styles.resetButtonText}>🔄 Reset</Text>
-                  </TouchableOpacity>
-                )}
+                {/* Botão de Resetar Sorteios - para todos os tipos de campeonato */}
+                <TouchableOpacity
+                  style={styles.resetButton}
+                  onPress={handleResetDraws}
+                >
+                  <Text style={styles.resetButtonText}>🔄 Reset</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.clearButton}
                   onPress={handleClearResults}

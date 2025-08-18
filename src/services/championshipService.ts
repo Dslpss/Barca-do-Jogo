@@ -2600,32 +2600,42 @@ export class ChampionshipService {
         throw new Error("Campeonato não encontrado");
       }
 
-      if (championship.type !== "grupos") {
-        throw new Error("Esta função só é válida para campeonatos por grupos");
-      }
-
-      console.log("🔄 Resetando sorteios do campeonato:", championship.name);
-
-      // Limpar grupos
-      championship.groups = [];
+      console.log("🔄 Resetando campeonato:", championship.name, "- Tipo:", championship.type);
 
       // Limpar todas as partidas
       championship.matches = [];
 
-      // Resetar fase para grupos
-      championship.currentPhase = "grupos";
+      // Resetar configurações específicas por tipo
+      if (championship.type === "grupos") {
+        // Limpar grupos
+        championship.groups = [];
+        // Resetar fase para grupos
+        championship.currentPhase = "grupos";
+        console.log("✅ Grupos e partidas removidos");
+      } else if (championship.type === "mata_mata") {
+        // Resetar eliminações dos times
+        if (championship.teams) {
+          championship.teams = championship.teams.map(team => ({
+            ...team,
+            eliminated: false,
+            eliminatedInRound: undefined
+          }));
+        }
+        console.log("✅ Partidas removidas e eliminações resetadas");
+      } else if (championship.type === "pontos_corridos") {
+        // Para pontos corridos, apenas limpar partidas
+        console.log("✅ Partidas de pontos corridos removidas");
+      }
 
       // Resetar status para criado
       championship.status = "criado";
-
-      console.log("✅ Sorteios resetados - grupos e partidas removidos");
 
       // Salvar no Firebase
       await this.updateChampionship(championship);
 
       console.log("💾 Campeonato atualizado no Firebase");
     } catch (error) {
-      console.error("❌ Erro ao resetar sorteios:", error);
+      console.error("❌ Erro ao resetar campeonato:", error);
       throw error;
     }
   }
