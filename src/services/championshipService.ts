@@ -129,6 +129,7 @@ export class ChampionshipService {
           matches: data.matches || [],
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
+          champion: typeof data.champion === "string" ? data.champion : (data.champion?.name || ""),
         };
 
         // Se o ID foi corrigido, atualizar no Firebase
@@ -273,6 +274,7 @@ export class ChampionshipService {
           return {
             id: championshipDoc.id,
             ...championshipData,
+            champion: typeof championshipData.champion === "string" ? championshipData.champion : (championshipData.champion?.name || ""),
           } as Championship;
         }
       }
@@ -1051,6 +1053,16 @@ export class ChampionshipService {
       console.log("⚔️ Verificando se pode gerar próxima fase do mata-mata...");
       await this.checkAndGenerateNextKnockoutRound(championshipId);
     }
+
+    // *** PONTOS CORRIDOS DINÂMICO: Verificar se pode gerar próxima rodada ***
+    if (championship.type === "pontos_corridos") {
+      console.log("🔄 INICIANDO VERIFICAÇÃO DE GERAÇÃO DINÂMICA...");
+      console.log("🏆 Tipo de campeonato:", championship.type);
+      console.log("⚙️ Configurações:", championship.matchGenerationOptions);
+
+      const result = await this.checkAndGenerateNextRound(championshipId);
+      console.log("🔄 RESULTADO DA VERIFICAÇÃO:", result);
+    }
   }
 
   // Pausar campeonato
@@ -1190,10 +1202,11 @@ export class ChampionshipService {
 
     console.log(`🔄 Gerando pontos corridos para ${teams.length} times`);
 
-    // LÓGICA DE SORTEIO PARA PONTOS CORRIDOS (Brasileirão):
-    // 1. Verificar se há configuração manual de rodadas/jogos
-    // 2. Se não houver, gerar turno e returno completos
-    // 3. Sortear apenas a ORDEM dos jogos e MANDO DE CAMPO
+    // NOVA LÓGICA DE SORTEIO PARA PONTOS CORRIDOS:
+    // 1. Detectar automaticamente o número de times
+    // 2. Permitir definir manualmente o número total de jogos
+    // 3. Distribuir jogos equilibradamente entre os times
+    // 4. Sem turno e returno fixos
 
     const matches: Match[] = [];
     let matchId = 0;
@@ -1203,160 +1216,139 @@ export class ChampionshipService {
       options?.type === "configured" && options.configuredOptions;
 
     if (hasCustomConfig && options.configuredOptions) {
-      // CONFIGURAÇÃO PERSONALIZADA (sua ideia!)
-      console.log("⚙️ Usando configuração personalizada de rodadas e jogos");
+      // CONFIGURAÇÃO PERSONALIZADA
+      console.log("⚙️ Usando configuração personalizada de jogos");
       const config = options.configuredOptions;
 
       console.log(`📅 Rodadas configuradas: ${config.totalRounds}`);
       console.log(`⚽ Partidas por time: ${config.matchesPerTeam}`);
       console.log(`📊 Distribuição: ${config.matchDistribution}`);
 
-      // Embaralhar times para sorteio da ordem
-      const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
-      console.log(
-        "🎲 Ordem sorteada dos times:",
-        shuffledTeams.map((t) => t.name)
-      );
+      // Calcular o número total de jogos com base na configuração
+      const totalGames = Math.floor((config.matchesPerTeam * teams.length) / 2);
+      console.log(`🏆 Total de jogos a serem gerados: ${totalGames}`);
 
-      for (let round = 1; round <= config.totalRounds; round++) {
-        console.log(`\n📅 Gerando rodada ${round}:`);
-
-        const teamsForRound = [...shuffledTeams];
-        let gamesThisRound = 0;
-        const maxGamesPerRound = Math.floor(teams.length / 2);
-
-        // Calcular quantos jogos gerar nesta rodada
-        const totalMatchesNeeded = (config.matchesPerTeam * teams.length) / 2; // Dividir por 2 pois cada jogo envolve 2 times
-        const matchesPerRound = Math.ceil(
-          totalMatchesNeeded / config.totalRounds
-        );
-        const targetGames = Math.min(matchesPerRound, maxGamesPerRound);
-
-        // Gerar confrontos para esta rodada
-        const usedTeams = new Set<string>();
-
-        for (
-          let attempt = 0;
-          attempt < 100 && gamesThisRound < targetGames;
-          attempt++
-        ) {
-          // Embaralhar times novamente para cada tentativa
-          const availableTeams = teamsForRound.filter(
-            (t) => !usedTeams.has(t.id)
-          );
-
-          if (availableTeams.length >= 2) {
-            const team1 =
-              availableTeams[Math.floor(Math.random() * availableTeams.length)];
-            const remainingTeams = availableTeams.filter(
-              (t) => t.id !== team1.id
-            );
-            const team2 =
-              remainingTeams[Math.floor(Math.random() * remainingTeams.length)];
-
-            // Sortear mando de campo
-            const [homeTeam, awayTeam] =
-              Math.random() < 0.5 ? [team1, team2] : [team2, team1];
-
-            matches.push({
-              id: `round_robin_${Date.now()}_${matchId++}`,
-              homeTeam: homeTeam.id,
-              awayTeam: awayTeam.id,
-              played: false,
-              homeGoalScorers: [],
-              awayGoalScorers: [],
-              round: round,
-              matchOrder: gamesThisRound + 1,
-            });
-
-            console.log(
-              `  ⚽ Jogo ${gamesThisRound + 1}: ${homeTeam.name} vs ${
-                awayTeam.name
-              } (mando: ${homeTeam.name})`
-            );
-
-            usedTeams.add(team1.id);
-            usedTeams.add(team2.id);
-            gamesThisRound++;
-          } else {
-            break; // Não há mais times disponíveis
-          }
+      // Gerar todas as combinações possíveis de confrontos
+      const allPossibleMatchups: { team1: Team; team2: Team }[] = [];
+      for (let i = 0; i < teams.length; i++) {
+        for (let j = i + 1; j < teams.length; j++) {
+          allPossibleMatchups.push({
+            team1: teams[i],
+            team2: teams[j],
+          });
         }
-
-        console.log(`✅ Rodada ${round}: ${gamesThisRound} jogos gerados`);
+      }
+      
+      // Embaralhar as combinações para sorteio aleatório
+      const shuffledMatchups = [...allPossibleMatchups].sort(() => Math.random() - 0.5);
+      console.log(`🎲 Combinações possíveis: ${shuffledMatchups.length}`);
+      
+      // Selecionar apenas o número de jogos necessários
+      const selectedMatchups = shuffledMatchups.slice(0, Math.min(totalGames, shuffledMatchups.length));
+      console.log(`✅ Jogos selecionados: ${selectedMatchups.length}`);
+      
+      // Distribuir os jogos pelas rodadas
+      const baseGamesPerRound = Math.floor(selectedMatchups.length / config.totalRounds);
+      const extraGames = selectedMatchups.length % config.totalRounds;
+      
+      let matchupIndex = 0;
+      
+      for (let round = 1; round <= config.totalRounds; round++) {
+        const gamesInThisRound = baseGamesPerRound + (round <= extraGames ? 1 : 0);
+        console.log(`\n📅 Rodada ${round}: ${gamesInThisRound} jogos`);
+        
+        for (let game = 0; game < gamesInThisRound && matchupIndex < selectedMatchups.length; game++) {
+          const matchup = selectedMatchups[matchupIndex];
+          
+          // Sortear mando de campo
+          const [homeTeam, awayTeam] = Math.random() < 0.5 
+            ? [matchup.team1, matchup.team2] 
+            : [matchup.team2, matchup.team1];
+          
+          matches.push({
+            id: `game_${Date.now()}_${matchId++}`,
+            homeTeam: homeTeam.id,
+            awayTeam: awayTeam.id,
+            played: false,
+            homeGoalScorers: [],
+            awayGoalScorers: [],
+            round: round,
+            matchOrder: game + 1,
+          });
+          
+          console.log(`  ⚽ Jogo ${game + 1}: ${homeTeam.name} vs ${awayTeam.name} (mando: ${homeTeam.name})`);
+          matchupIndex++;
+        }
       }
     } else {
-      // TURNO E RETURNO COMPLETO (padrão brasileiro)
-      console.log("🇧🇷 Gerando turno e returno completo (padrão brasileiro)");
-
+      // MODO PADRÃO (sem configuração personalizada)
+      console.log("🏆 Gerando jogos no modo padrão (todos contra todos)");
+      
       // Embaralhar times para sorteio da ordem dos confrontos
       const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
       console.log(
         "🎲 Ordem sorteada para confrontos:",
         shuffledTeams.map((t) => t.name)
       );
-
-      let currentRound = 1;
-
-      // TURNO - todos contra todos (1 vez)
-      console.log("\n🔄 === GERANDO TURNO ===");
-      for (let i = 0; i < shuffledTeams.length; i++) {
-        for (let j = i + 1; j < shuffledTeams.length; j++) {
-          const team1 = shuffledTeams[i];
-          const team2 = shuffledTeams[j];
-
-          // Sortear mando de campo para o turno
-          const [homeTeam, awayTeam] =
-            Math.random() < 0.5 ? [team1, team2] : [team2, team1];
-
-          matches.push({
-            id: `turno_${Date.now()}_${matchId++}`,
-            homeTeam: homeTeam.id,
-            awayTeam: awayTeam.id,
-            played: false,
-            homeGoalScorers: [],
-            awayGoalScorers: [],
-            round: Math.ceil(
-              (i * shuffledTeams.length + j) / (shuffledTeams.length / 2)
-            ),
-            matchOrder:
-              ((i * shuffledTeams.length + j) % (shuffledTeams.length / 2)) + 1,
-          });
-
-          console.log(
-            `⚽ ${homeTeam.name} vs ${awayTeam.name} (mando: ${homeTeam.name})`
-          );
-        }
+      
+      // Calcular número de rodadas necessárias
+      const totalTeams = teams.length;
+      const totalRounds = totalTeams - 1; // Número mínimo de rodadas para todos jogarem entre si
+      
+      // Gerar jogos - todos contra todos (1 vez)
+      console.log("\n🔄 === GERANDO JOGOS ===");
+      
+      // Algoritmo para distribuir jogos em rodadas (Round Robin)
+      // Baseado no algoritmo de Circle Method
+      const teamsForAlgorithm = [...shuffledTeams];
+      if (totalTeams % 2 === 1) {
+        // Adicionar um time "fantasma" para parear
+        teamsForAlgorithm.push({ id: "bye", name: "Bye", color: "#000000", players: [] });
       }
-
-      // RETURNO - todos contra todos (invertendo mando)
-      console.log("\n🔄 === GERANDO RETURNO ===");
-      const turnoMatches = [...matches];
-      const maxTurnoRound = Math.max(...turnoMatches.map((m) => m.round || 1));
-
-      turnoMatches.forEach((turnoMatch, index) => {
-        // Inverter mando de campo no returno
-        matches.push({
-          id: `returno_${Date.now()}_${matchId++}`,
-          homeTeam: turnoMatch.awayTeam, // Invertido
-          awayTeam: turnoMatch.homeTeam, // Invertido
-          played: false,
-          homeGoalScorers: [],
-          awayGoalScorers: [],
-          round: maxTurnoRound + (turnoMatch.round || 1),
-          matchOrder: turnoMatch.matchOrder,
-        });
-
-        const homeTeamName = teams.find(
-          (t) => t.id === turnoMatch.awayTeam
-        )?.name;
-        const awayTeamName = teams.find(
-          (t) => t.id === turnoMatch.homeTeam
-        )?.name;
-        console.log(
-          `⚽ ${homeTeamName} vs ${awayTeamName} (returno - mando invertido)`
-        );
-      });
+      
+      const n = teamsForAlgorithm.length;
+      
+      for (let round = 1; round <= totalRounds; round++) {
+        console.log(`\n📅 Rodada ${round}:`);
+        let gamesInRound = 0;
+        
+        for (let i = 0; i < n / 2; i++) {
+          const team1 = teamsForAlgorithm[i];
+          const team2 = teamsForAlgorithm[n - 1 - i];
+          
+          // Ignorar jogos com o time "fantasma"
+          if (team1.id !== "bye" && team2.id !== "bye") {
+            // Sortear mando de campo
+            const [homeTeam, awayTeam] = Math.random() < 0.5 
+              ? [team1, team2] 
+              : [team2, team1];
+            
+            matches.push({
+              id: `game_${Date.now()}_${matchId++}`,
+              homeTeam: homeTeam.id,
+              awayTeam: awayTeam.id,
+              played: false,
+              homeGoalScorers: [],
+              awayGoalScorers: [],
+              round: round,
+              matchOrder: gamesInRound + 1,
+            });
+            
+            console.log(`  ⚽ Jogo ${gamesInRound + 1}: ${homeTeam.name} vs ${awayTeam.name} (mando: ${homeTeam.name})`);
+            gamesInRound++;
+          }
+        }
+        
+        // Rotacionar os times para a próxima rodada (mantendo o primeiro fixo)
+        const firstTeam = teamsForAlgorithm[0];
+        const lastTeam = teamsForAlgorithm[n - 1];
+        
+        for (let i = n - 1; i > 1; i--) {
+          teamsForAlgorithm[i] = teamsForAlgorithm[i - 1];
+        }
+        
+        teamsForAlgorithm[1] = lastTeam;
+      }
     }
 
     console.log(`\n🎉 ${matches.length} partidas geradas para pontos corridos`);
@@ -1364,7 +1356,7 @@ export class ChampionshipService {
       `📊 Tipo: ${
         hasCustomConfig
           ? "Configuração personalizada"
-          : "Turno e returno completo"
+          : "Todos contra todos (simples)"
       }`
     );
 
@@ -1907,6 +1899,15 @@ export class ChampionshipService {
       if (winners.length === 1) {
         const champion = championship.teams.find((t) => t.id === winners[0]);
         console.log(`👑 CAMPEÃO: ${champion?.name}`);
+        
+        // Marcar o campeonato como finalizado
+        championship.status = "finalizado";
+        championship.champion = champion?.name || "";
+        
+        console.log(`✅ Campeonato finalizado com sucesso!`);
+        console.log(`🏆 Campeão oficial: ${champion?.name}`);
+      } else {
+        console.log(`⚠️ Nenhum campeão determinado (erro no mata-mata)`);
       }
       return [];
     }
@@ -2037,6 +2038,226 @@ export class ChampionshipService {
 
     // Pode gerar se todas as partidas da rodada atual foram jogadas
     return unplayedMatches.length === 0 && currentRoundMatches.length > 0;
+  }
+
+  // Verificar se pode gerar próxima rodada do pontos corridos
+  static async checkAndGenerateNextRound(
+    championshipId: string
+  ): Promise<boolean> {
+    console.log("🔄 Verificando se pode gerar próxima rodada...");
+
+    const championship = await this.getChampionshipById(championshipId);
+    if (!championship) {
+      console.log("❌ Campeonato não encontrado");
+      return false;
+    }
+
+    // Verificar se há configurações de geração automática
+    const options = championship.matchGenerationOptions;
+    console.log("🔍 Configurações encontradas:", options);
+
+    if (!options?.configuredOptions) {
+      console.log("ℹ️ Sem configurações de geração automática");
+      return false;
+    }
+
+    // Verificar se é modo dinâmico
+    if (options.configuredOptions.generationMode !== "dynamic") {
+      console.log("ℹ️ Não é modo dinâmico, pulando geração automática");
+      return false;
+    }
+
+    const config = options.configuredOptions;
+    const currentMatches = championship.matches || [];
+
+    // Encontrar a rodada atual (maior rodada existente)
+    const currentRound =
+      currentMatches.length > 0
+        ? Math.max(...currentMatches.map((m) => m.round || 1))
+        : 0;
+
+    console.log(`📅 Rodada atual: ${currentRound} de ${config.totalRounds}`);
+
+    // Verificar se ainda há rodadas para gerar
+    if (currentRound >= config.totalRounds) {
+      console.log("✅ Todas as rodadas já foram geradas");
+      return false;
+    }
+
+    // Verificar se todas as partidas da rodada atual foram jogadas
+    const currentRoundMatches = currentMatches.filter(
+      (m) => (m.round || 1) === currentRound
+    );
+    const unplayedMatches = currentRoundMatches.filter((m) => !m.played);
+
+    console.log(
+      `🎮 Partidas da rodada ${currentRound}: ${currentRoundMatches.length} total, ${unplayedMatches.length} não jogadas`
+    );
+
+    // Debug: mostrar detalhes das partidas
+    console.log("🔍 Detalhes das partidas da rodada atual:");
+    currentRoundMatches.forEach((match, index) => {
+      console.log(`  ${index + 1}. ${match.id} - Jogada: ${match.played}`);
+    });
+
+    if (unplayedMatches.length > 0) {
+      console.log("⏳ Ainda há partidas não jogadas na rodada atual");
+      console.log(
+        "🔍 Partidas não jogadas:",
+        unplayedMatches.map((m) => m.id)
+      );
+      return false;
+    }
+
+    // Gerar próxima rodada
+    const nextRound = currentRound + 1;
+    console.log(`🚀 Gerando rodada ${nextRound}...`);
+
+    try {
+      await this.generateNextRoundMatches(championshipId, nextRound, config);
+      console.log(`✅ Rodada ${nextRound} gerada com sucesso!`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Erro ao gerar rodada ${nextRound}:`, error);
+      return false;
+    }
+  }
+
+  // Gerar partidas da próxima rodada
+  static async generateNextRoundMatches(
+    championshipId: string,
+    round: number,
+    config: any
+  ): Promise<void> {
+    console.log(`🏗️ Gerando partidas para rodada ${round}...`);
+
+    const championship = await this.getChampionshipById(championshipId);
+    if (!championship) throw new Error("Campeonato não encontrado");
+
+    const teams = championship.teams || [];
+    const existingMatches = championship.matches || [];
+
+    // Gerar todas as combinações possíveis
+    const allPossibleMatches: any[] = [];
+    for (let i = 0; i < teams.length; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        allPossibleMatches.push({
+          homeTeamId: teams[i].id,
+          awayTeamId: teams[j].id,
+        });
+      }
+    }
+
+    // Filtrar combinações que já foram usadas
+    const usedCombinations = new Set();
+    existingMatches.forEach((match) => {
+      const combo1 = `${match.homeTeam}-${match.awayTeam}`;
+      const combo2 = `${match.awayTeam}-${match.homeTeam}`;
+      usedCombinations.add(combo1);
+      usedCombinations.add(combo2);
+    });
+
+    const availableMatches = allPossibleMatches.filter((match) => {
+      const combo1 = `${match.homeTeamId}-${match.awayTeamId}`;
+      const combo2 = `${match.awayTeamId}-${match.homeTeamId}`;
+      return !usedCombinations.has(combo1) && !usedCombinations.has(combo2);
+    });
+
+    console.log(
+      `🎲 Combinações disponíveis para rodada ${round}: ${availableMatches.length}`
+    );
+
+    // Se não há combinações únicas disponíveis, gerar jogos de volta
+    if (availableMatches.length === 0) {
+      console.log(
+        "🔄 Sem combinações únicas, tentando gerar jogos de volta..."
+      );
+
+      // Gerar jogos de volta (inverter mando de campo)
+      for (let i = 0; i < teams.length; i++) {
+        for (let j = i + 1; j < teams.length; j++) {
+          // Verificar se já existe o jogo de volta
+          const returnMatchExists = existingMatches.some(
+            (match) =>
+              match.homeTeam === teams[j].id && match.awayTeam === teams[i].id
+          );
+
+          if (!returnMatchExists) {
+            availableMatches.push({
+              homeTeamId: teams[j].id,
+              awayTeamId: teams[i].id,
+            });
+          }
+        }
+      }
+
+      console.log(`🔄 Jogos de volta disponíveis: ${availableMatches.length}`);
+
+      if (availableMatches.length === 0) {
+        console.log(
+          "⚠️ Não há mais combinações disponíveis (nem jogos de volta)"
+        );
+        return;
+      }
+    }
+
+    // Calcular quantos jogos gerar nesta rodada
+    let matchesThisRound: number;
+
+    if (config.gameDistributionMode === "manual" && config.totalGames) {
+      // Modo manual: calcular baseado no total de jogos configurado
+      const totalGamesConfigured = config.totalGames;
+      const gamesAlreadyGenerated = existingMatches.length;
+      const gamesRemaining = totalGamesConfigured - gamesAlreadyGenerated;
+      const roundsRemaining = config.totalRounds - round + 1;
+
+      matchesThisRound = Math.min(
+        Math.ceil(gamesRemaining / roundsRemaining),
+        Math.floor(teams.length / 2), // Máximo de jogos simultâneos
+        availableMatches.length // Não pode exceder combinações disponíveis
+      );
+
+      console.log(
+        `📊 Cálculo manual: ${gamesRemaining} jogos restantes, ${roundsRemaining} rodadas restantes`
+      );
+    } else {
+      // Modo automático: distribuir combinações disponíveis
+      const totalRoundsRemaining = config.totalRounds - round + 1;
+      matchesThisRound = Math.min(
+        Math.ceil(availableMatches.length / totalRoundsRemaining),
+        Math.floor(teams.length / 2) // Máximo de jogos simultâneos
+      );
+    }
+
+    console.log(`⚽ Gerando ${matchesThisRound} jogos para rodada ${round}`);
+
+    // Selecionar jogos aleatoriamente
+    const selectedMatches = availableMatches
+      .sort(() => Math.random() - 0.5)
+      .slice(0, matchesThisRound);
+
+    // Criar as partidas
+    let matchId = Date.now();
+    const newMatches = selectedMatches.map((match) => ({
+      id: `round_${round}_${matchId++}`,
+      homeTeam: match.homeTeamId,
+      awayTeam: match.awayTeamId,
+      played: false,
+      homeGoalScorers: [],
+      awayGoalScorers: [],
+      round: round,
+      matchOrder: championship.matches.length + 1,
+    }));
+
+    // Adicionar as novas partidas ao campeonato
+    championship.matches.push(...newMatches);
+
+    // Salvar o campeonato
+    await this.updateChampionship(championship, true);
+
+    console.log(
+      `✅ ${newMatches.length} partidas adicionadas à rodada ${round}`
+    );
   }
 
   // Verificar automaticamente se deve gerar próxima fase após registrar resultado
@@ -2173,9 +2394,14 @@ export class ChampionshipService {
 
     const matches: Match[] = [];
     let matchId = 0;
-    const hasReturnMatches = championship.groupStageSettings?.hasReturnMatches ?? true; // Padrão: ida e volta
+    const hasReturnMatches =
+      championship.groupStageSettings?.hasReturnMatches ?? true; // Padrão: ida e volta
 
-    console.log(`🏆 Gerando partidas da fase de grupos (${hasReturnMatches ? 'ida e volta' : 'apenas ida'})`);
+    console.log(
+      `🏆 Gerando partidas da fase de grupos (${
+        hasReturnMatches ? "ida e volta" : "apenas ida"
+      })`
+    );
 
     championship.groups.forEach((group, groupIndex) => {
       if (group.teamIds.length < 2) {
@@ -2469,7 +2695,8 @@ export class ChampionshipService {
       );
 
       // Calcular quantas partidas deveriam existir no grupo
-      const hasReturnMatches = championship.groupStageSettings?.hasReturnMatches ?? true;
+      const hasReturnMatches =
+        championship.groupStageSettings?.hasReturnMatches ?? true;
       const expectedMatches = this.calculateExpectedGroupMatches(
         group.teamIds.length,
         hasReturnMatches
@@ -2487,7 +2714,10 @@ export class ChampionshipService {
   }
 
   // Calcular o número esperado de partidas em um grupo
-  static calculateExpectedGroupMatches(teamCount: number, hasReturnMatches: boolean = true): number {
+  static calculateExpectedGroupMatches(
+    teamCount: number,
+    hasReturnMatches: boolean = true
+  ): number {
     if (hasReturnMatches) {
       // Fórmula para todos contra todos (ida e volta): n * (n - 1)
       return teamCount * (teamCount - 1);
@@ -2523,7 +2753,9 @@ export class ChampionshipService {
       if (sortedStandings.length > 0) {
         const winner = sortedStandings[0];
         qualifiedTeams.push(winner.teamId);
-        console.log(`🏆 Vencedor do ${group.name}: Time ${winner.teamId} (${winner.points} pts)`);
+        console.log(
+          `🏆 Vencedor do ${group.name}: Time ${winner.teamId} (${winner.points} pts)`
+        );
       }
     });
 
@@ -2538,11 +2770,17 @@ export class ChampionshipService {
     );
 
     // Gerar partidas do mata-mata diretamente
-    return this.generateKnockoutMatchesFromTeams(qualifiedTeamsData, championship.id);
+    return this.generateKnockoutMatchesFromTeams(
+      qualifiedTeamsData,
+      championship.id
+    );
   }
 
   // Método específico para gerar mata-mata a partir de uma lista de times
-  static generateKnockoutMatchesFromTeams(teams: Team[], championshipId: string): Match[] {
+  static generateKnockoutMatchesFromTeams(
+    teams: Team[],
+    championshipId: string
+  ): Match[] {
     if (teams.length < 2) {
       throw new Error("É necessário pelo menos 2 times para mata-mata");
     }
@@ -2559,7 +2797,7 @@ export class ChampionshipService {
 
     // Gerar primeira fase do mata-mata
     const pairsCount = Math.floor(shuffledTeams.length / 2);
-    
+
     for (let i = 0; i < pairsCount; i++) {
       const homeTeam = shuffledTeams[i * 2];
       const awayTeam = shuffledTeams[i * 2 + 1];
@@ -2579,13 +2817,17 @@ export class ChampionshipService {
       };
 
       matches.push(match);
-      console.log(`🥊 Confronto ${i + 1}: ${homeTeam.name} vs ${awayTeam.name}`);
+      console.log(
+        `🥊 Confronto ${i + 1}: ${homeTeam.name} vs ${awayTeam.name}`
+      );
     }
 
     // Se houver um time ímpar, ele passa automaticamente
     if (shuffledTeams.length % 2 === 1) {
       const byeTeam = shuffledTeams[shuffledTeams.length - 1];
-      console.log(`🎯 ${byeTeam.name} passa automaticamente para a próxima fase`);
+      console.log(
+        `🎯 ${byeTeam.name} passa automaticamente para a próxima fase`
+      );
     }
 
     console.log(`✅ ${matches.length} partidas de mata-mata geradas!`);
@@ -2600,7 +2842,12 @@ export class ChampionshipService {
         throw new Error("Campeonato não encontrado");
       }
 
-      console.log("🔄 Resetando campeonato:", championship.name, "- Tipo:", championship.type);
+      console.log(
+        "🔄 Resetando campeonato:",
+        championship.name,
+        "- Tipo:",
+        championship.type
+      );
 
       // Limpar todas as partidas
       championship.matches = [];
@@ -2615,10 +2862,10 @@ export class ChampionshipService {
       } else if (championship.type === "mata_mata") {
         // Resetar eliminações dos times
         if (championship.teams) {
-          championship.teams = championship.teams.map(team => ({
+          championship.teams = championship.teams.map((team) => ({
             ...team,
             eliminated: false,
-            eliminatedInRound: undefined
+            eliminatedInRound: undefined,
           }));
         }
         console.log("✅ Partidas removidas e eliminações resetadas");

@@ -481,23 +481,19 @@ export const useChampionship = () => {
         if (match.homeScore > match.awayScore) {
           console.log("🏆 STATS: Vitória do time da casa");
           homeStats.wins++;
-          homeStats.points +=
-            currentChampionship.type === "pontos_corridos" ? 3 : 1;
+          homeStats.points += 3; // Sempre 3 pontos por vitória
           awayStats.losses++;
         } else if (match.awayScore > match.homeScore) {
           console.log("🏆 STATS: Vitória do time visitante");
           awayStats.wins++;
-          awayStats.points +=
-            currentChampionship.type === "pontos_corridos" ? 3 : 1;
+          awayStats.points += 3; // Sempre 3 pontos por vitória
           homeStats.losses++;
         } else {
           console.log("🤝 STATS: Empate");
           homeStats.draws++;
           awayStats.draws++;
-          if (currentChampionship.type === "pontos_corridos") {
-            homeStats.points += 1;
-            awayStats.points += 1;
-          }
+          homeStats.points += 1; // Sempre 1 ponto por empate
+          awayStats.points += 1; // Sempre 1 ponto por empate
         }
 
         console.log("📊 STATS: Estatísticas atualizadas:", {

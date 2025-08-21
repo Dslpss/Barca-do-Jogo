@@ -103,34 +103,15 @@ const ChampionshipMatchesScreen = () => {
     // ADAPTAR OPÇÕES BASEADO NO TIPO DE CAMPEONATO
     switch (championshipType) {
       case "pontos_corridos":
-        // PONTOS CORRIDOS: Configuração manual OU turno/returno automático
+        // PONTOS CORRIDOS: Apenas configuração manual
         Alert.alert(
           "🔄 Pontos Corridos",
-          `Campeonato de pontos corridos com ${teamsCount} times.\n\nEscolha como gerar as partidas:`,
+          `Campeonato de pontos corridos com ${teamsCount} times.\n\nConfigurar partidas manualmente:`,
           [
             { text: "Cancelar", style: "cancel" },
             {
-              text: "⚙️ Configurar Rodadas",
+              text: "⚙️ Configurar Manualmente",
               onPress: () => setShowConfiguredGenerationModal(true),
-            },
-            {
-              text: "🇧🇷 Turno e Returno",
-              onPress: async () => {
-                try {
-                  console.log("🔄 Gerando turno e returno automático...");
-                  await generateMatches(); // Sem opções = automático
-                  Alert.alert(
-                    "Sucesso",
-                    "Turno e returno gerados com sucesso!"
-                  );
-                } catch (error) {
-                  console.error("Erro ao gerar pontos corridos:", error);
-                  Alert.alert(
-                    "Erro",
-                    "Erro ao gerar partidas. Tente novamente."
-                  );
-                }
-              },
             },
           ]
         );
@@ -148,15 +129,15 @@ const ChampionshipMatchesScreen = () => {
               onPress: async () => {
                 try {
                   console.log("🏆 Gerando fase de grupos com ida e volta...");
-                  
+
                   // Configurar ida e volta
                   if (currentChampionship) {
                     currentChampionship.groupStageSettings = {
-                      hasReturnMatches: true
+                      hasReturnMatches: true,
                     };
                     await updateChampionship(currentChampionship);
                   }
-                  
+
                   await generateMatches(); // Automático para grupos
                   Alert.alert(
                     "Sucesso",
@@ -176,15 +157,15 @@ const ChampionshipMatchesScreen = () => {
               onPress: async () => {
                 try {
                   console.log("🏆 Gerando fase de grupos apenas ida...");
-                  
+
                   // Configurar apenas ida
                   if (currentChampionship) {
                     currentChampionship.groupStageSettings = {
-                      hasReturnMatches: false
+                      hasReturnMatches: false,
                     };
                     await updateChampionship(currentChampionship);
                   }
-                  
+
                   await generateMatches(); // Automático para grupos
                   Alert.alert(
                     "Sucesso",
@@ -488,41 +469,41 @@ const ChampionshipMatchesScreen = () => {
     // Mensagem personalizada baseada no tipo de campeonato
     let resetMessage = "";
     if (currentChampionship.type === "grupos") {
-      resetMessage = "Tem certeza que deseja resetar TODOS os sorteios?\n\n⚠️ Isso irá:\n• Apagar todos os grupos\n• Remover todas as partidas\n• Resetar o campeonato\n\nEsta ação não pode ser desfeita.";
+      resetMessage =
+        "Tem certeza que deseja resetar TODOS os sorteios?\n\n⚠️ Isso irá:\n• Apagar todos os grupos\n• Remover todas as partidas\n• Resetar o campeonato\n\nEsta ação não pode ser desfeita.";
     } else if (currentChampionship.type === "pontos_corridos") {
-      resetMessage = "Tem certeza que deseja resetar o campeonato?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar todas as configurações\n• Voltar ao estado inicial\n\nEsta ação não pode ser desfeita.";
+      resetMessage =
+        "Tem certeza que deseja resetar o campeonato?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar todas as configurações\n• Voltar ao estado inicial\n\nEsta ação não pode ser desfeita.";
     } else if (currentChampionship.type === "mata_mata") {
-      resetMessage = "Tem certeza que deseja resetar o mata-mata?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar eliminações\n• Voltar ao estado inicial\n\nEsta ação não pode ser desfeita.";
+      resetMessage =
+        "Tem certeza que deseja resetar o mata-mata?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar eliminações\n• Voltar ao estado inicial\n\nEsta ação não pode ser desfeita.";
     } else {
-      resetMessage = "Tem certeza que deseja resetar o campeonato?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar todas as configurações\n\nEsta ação não pode ser desfeita.";
+      resetMessage =
+        "Tem certeza que deseja resetar o campeonato?\n\n⚠️ Isso irá:\n• Remover todas as partidas\n• Resetar todas as configurações\n\nEsta ação não pode ser desfeita.";
     }
 
-    Alert.alert(
-      "🔄 Resetar Campeonato",
-      resetMessage,
-      [
-        {
-          text: "Cancelar",
-          style: "cancel",
+    Alert.alert("🔄 Resetar Campeonato", resetMessage, [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "🗑️ Resetar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await resetGroupDraws();
+            Alert.alert(
+              "Sucesso",
+              "Sorteios resetados com sucesso!\n\nO campeonato foi resetado para o estado inicial. Agora você pode fazer novos sorteios."
+            );
+          } catch (error) {
+            console.error("❌ Erro ao resetar sorteios:", error);
+            Alert.alert("Erro", "Erro ao resetar sorteios. Tente novamente.");
+          }
         },
-        {
-          text: "🗑️ Resetar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await resetGroupDraws();
-              Alert.alert(
-                "Sucesso",
-                "Sorteios resetados com sucesso!\n\nO campeonato foi resetado para o estado inicial. Agora você pode fazer novos sorteios."
-              );
-            } catch (error) {
-              console.error("❌ Erro ao resetar sorteios:", error);
-              Alert.alert("Erro", "Erro ao resetar sorteios. Tente novamente.");
-            }
-          },
-        },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleClearResults = async () => {
@@ -1115,6 +1096,21 @@ const ChampionshipMatchesScreen = () => {
     currentChampionship?.matches?.filter((m) => m.played).length || 0;
   const totalMatches = currentChampionship?.matches?.length || 0;
 
+  // Obter informações das rodadas configuradas
+  const matchGenerationOptions = currentChampionship?.matchGenerationOptions;
+  const configuredRounds =
+    matchGenerationOptions?.configuredOptions?.totalRounds;
+  const gameDistributionMode =
+    matchGenerationOptions?.configuredOptions?.gameDistributionMode;
+  const totalGamesConfigured =
+    matchGenerationOptions?.configuredOptions?.totalGames;
+
+  // Calcular rodadas atuais baseado nas partidas existentes
+  const currentRounds =
+    currentChampionship?.matches?.length > 0
+      ? Math.max(...currentChampionship.matches.map((m) => m.round || 1))
+      : 0;
+
   return (
     <View style={styles.container}>
       <AppHeader title="Partidas do Campeonato" icon="calendar" theme="light" />
@@ -1151,9 +1147,26 @@ const ChampionshipMatchesScreen = () => {
               </View>
             </View>
             <View style={styles.championshipBadge}>
-              <Text style={styles.championshipBadgeText}>ATIVO</Text>
+              <Text style={styles.championshipBadgeText}>
+                {currentChampionship.status === "finalizado"
+                  ? "FINALIZADO"
+                  : "ATIVO"}
+              </Text>
             </View>
           </View>
+
+          {/* Exibição do Campeão */}
+          {currentChampionship.status === "finalizado" &&
+            currentChampionship.champion && (
+              <View style={styles.championSection}>
+                <Text style={styles.championTitle}>🏆 CAMPEÃO</Text>
+                <Text style={styles.championName}>
+                  {currentChampionship.teams.find(
+                    (t) => t.id === currentChampionship.champion
+                  )?.name || ""}
+                </Text>
+              </View>
+            )}
 
           <View style={styles.progressSection}>
             <View style={styles.progressInfo}>
@@ -1163,6 +1176,18 @@ const ChampionshipMatchesScreen = () => {
                 {String(currentChampionship?.matches?.length || 0)} partidas
                 realizadas
               </Text>
+              {configuredRounds && (
+                <Text style={styles.roundsProgress}>
+                  📅 Rodadas: {currentRounds} de {configuredRounds} configuradas
+                  {gameDistributionMode === "manual" &&
+                    totalGamesConfigured && (
+                      <Text style={styles.configInfo}>
+                        {" "}
+                        • {totalGamesConfigured} jogos totais
+                      </Text>
+                    )}
+                </Text>
+              )}
             </View>
 
             <View style={styles.progressBarContainer}>
@@ -1724,6 +1749,27 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 10,
   },
+  championSection: {
+    backgroundColor: "#fff3cd",
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#ffc107",
+  },
+  championTitle: {
+    ...theme.typography.h3,
+    color: "#856404",
+    fontWeight: "bold",
+    marginBottom: theme.spacing.xs,
+  },
+  championName: {
+    ...theme.typography.h2,
+    color: "#856404",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
   progressSection: {
     marginBottom: theme.spacing.md,
   },
@@ -1740,6 +1786,17 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.text,
     fontWeight: "500",
+  },
+  roundsProgress: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    fontSize: 12,
+    fontStyle: "italic",
+    marginTop: 4,
+  },
+  configInfo: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
   },
   progressBarContainer: {
     flexDirection: "row",
@@ -2151,6 +2208,8 @@ const modalStyles = StyleSheet.create({
     flexDirection: "row",
     gap: theme.spacing.sm,
     marginTop: theme.spacing.lg,
+    marginHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
   },
   cancelButton: {
     flex: 1,

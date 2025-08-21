@@ -58,6 +58,9 @@ export interface ConfiguredMatchOptions {
   totalRounds: number; // Número total de rodadas
   matchesPerTeam: number; // Número de partidas que cada time vai jogar
   matchDistribution: "equal" | "custom"; // Distribuição igual ou personalizada
+  totalGames?: number; // Número total de jogos do campeonato (opcional)
+  gameDistributionMode?: "auto" | "manual"; // Modo de distribuição: automático ou manual
+  generationMode?: "complete" | "dynamic"; // Modo de geração: completo ou dinâmico
 }
 
 export interface ManualMatch {
@@ -79,6 +82,7 @@ export interface Championship {
   groupStageSettings?: {
     hasReturnMatches: boolean; // Se terá jogos de ida e volta na fase de grupos
   };
+  champion?: string; // ID do time campeão (quando campeonato finalizado)
   createdAt: string;
   updatedAt: string;
   finishedAt?: string; // Data de finalização do campeonato

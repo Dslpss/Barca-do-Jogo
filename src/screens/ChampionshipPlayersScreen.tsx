@@ -383,7 +383,7 @@ const ChampionshipPlayersScreen = () => {
 
               {renderStars(playerSkill, setPlayerSkill)}
 
-              <View style={styles.modalButtons}>
+              <View style={[styles.modalButtons, { marginHorizontal: theme.spacing.md, paddingTop: theme.spacing.md }]}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton]}
                   onPress={() => {

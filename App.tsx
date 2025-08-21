@@ -15,6 +15,7 @@ import ChampionshipPlayersScreen from "./src/screens/ChampionshipPlayersScreen";
 import ChampionshipAllPlayersScreen from "./src/screens/ChampionshipAllPlayersScreen";
 import ChampionshipMatchesScreen from "./src/screens/ChampionshipMatchesScreen";
 import ChampionshipTableScreen from "./src/screens/ChampionshipTableScreen";
+import QuickDrawScreen from "./src/screens/QuickDrawScreen";
 
 // Ignorar warnings específicos do Firebase que são conhecidos
 LogBox.ignoreLogs([
@@ -64,6 +65,12 @@ export default function App() {
               <Stack.Screen
                 name="ChampionshipTable"
                 component={ChampionshipTableScreen}
+              />
+              
+              {/* Tela de Sorteio Rápido */}
+              <Stack.Screen
+                name="QuickDraw"
+                component={QuickDrawScreen}
               />
             </Stack.Navigator>
           </NavigationContainer>

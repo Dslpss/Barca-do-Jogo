@@ -259,6 +259,27 @@ function HomeScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Botão de Sorteio Rápido */}
+        <View style={styles.quickDrawContainer}>
+          <TouchableOpacity
+            style={styles.quickDrawButton}
+            onPress={() => navigation.navigate("QuickDraw")}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={["#00b09b", "#96c93d"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.quickDrawGradient}
+            >
+              <View style={styles.quickDrawContent}>
+                <Ionicons name="shuffle" size={24} color="#fff" />
+                <Text style={styles.quickDrawText}>Sorteio Rápido</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </LinearGradient>
   );
@@ -454,6 +475,35 @@ const styles = StyleSheet.create({
   },
   rotating: {
     transform: [{ rotate: "360deg" }],
+  },
+  // Estilos para o botão de sorteio rápido
+  quickDrawContainer: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  quickDrawButton: {
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  quickDrawGradient: {
+    padding: 16,
+  },
+  quickDrawContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  quickDrawText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
 

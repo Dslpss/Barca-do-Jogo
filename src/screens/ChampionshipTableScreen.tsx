@@ -271,10 +271,16 @@ const ChampionshipTableScreen = () => {
           <Text style={styles.championshipName}>
             {currentChampionship.name}
           </Text>
-          <Text style={styles.matchesInfo}>
-            {playedMatches} de {currentChampionship?.matches?.length || 0}{" "}
-            partidas realizadas
-          </Text>
+          {currentChampionship.status === "finalizado" && currentChampionship.champion ? (
+            <Text style={styles.championInfo}>
+              🏆 Campeão: {currentChampionship.champion.name}
+            </Text>
+          ) : (
+            <Text style={styles.matchesInfo}>
+              {playedMatches} de {currentChampionship?.matches?.length || 0}{" "}
+              partidas realizadas
+            </Text>
+          )}
         </View>
 
         {(currentChampionship?.teams || []).length === 0 ? (
@@ -421,6 +427,12 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.white,
     opacity: 0.9,
+  },
+  championInfo: {
+    ...theme.typography.h3,
+    color: theme.colors.white,
+    fontWeight: "bold",
+    textAlign: "center",
   },
   emptyState: {
     flex: 1,
