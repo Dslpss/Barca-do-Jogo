@@ -1,12 +1,17 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import connectivityService from './connectivityService';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import connectivityService from "./connectivityService";
 
-const OFFLINE_QUEUE_KEY = 'offlineQueue';
-const FAILED_OPERATIONS_KEY = 'failedOperations';
+const OFFLINE_QUEUE_KEY = "offlineQueue";
+const FAILED_OPERATIONS_KEY = "failedOperations";
 
 export interface OfflineOperation {
   id: string;
-  type: 'championship_update' | 'championship_create' | 'championship_delete' | 'match_result' | 'user_preference';
+  type:
+    | "championship_update"
+    | "championship_create"
+    | "championship_delete"
+    | "match_result"
+    | "user_preference";
   data: any;
   timestamp: string;
   retryCount: number;
@@ -28,33 +33,37 @@ class OfflineQueueService {
       const queueData = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
       if (queueData) {
         this.queue = JSON.parse(queueData);
-        console.log(`📋 Fila offline carregada: ${this.queue.length} operações pendentes`);
+        console.log(
+          `📋 Fila offline carregada: ${this.queue.length} operações pendentes`
+        );
       }
     } catch (error) {
-      console.error('Erro ao carregar fila offline:', error);
+      console.error("Erro ao carregar fila offline:", error);
     }
   }
 
   private setupConnectivityListener() {
     connectivityService.addConnectivityListener((isOnline) => {
       if (isOnline && this.queue.length > 0) {
-        console.log('🔄 Conectividade restaurada - processando fila offline');
+        console.log("🔄 Conectividade restaurada - processando fila offline");
         this.processQueue();
       }
     });
   }
 
-  async addOperation(operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'retryCount'>) {
+  async addOperation(
+    operation: Omit<OfflineOperation, "id" | "timestamp" | "retryCount">
+  ) {
     const newOperation: OfflineOperation = {
       ...operation,
       id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
-      retryCount: 0
+      retryCount: 0,
     };
 
     this.queue.push(newOperation);
     await this.saveQueue();
-    
+
     console.log(`📝 Operação adicionada à fila offline: ${newOperation.type}`);
 
     // Se estiver online, tentar processar imediatamente
@@ -67,7 +76,7 @@ class OfflineQueueService {
     try {
       await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(this.queue));
     } catch (error) {
-      console.error('Erro ao salvar fila offline:', error);
+      console.error("Erro ao salvar fila offline:", error);
     }
   }
 
@@ -86,10 +95,15 @@ class OfflineQueueService {
       try {
         await this.executeOperation(operation);
         processedOperations.push(operation.id);
-        console.log(`✅ Operação processada: ${operation.type} (${operation.id})`);
+        console.log(
+          `✅ Operação processada: ${operation.type} (${operation.id})`
+        );
       } catch (error) {
-        console.error(`❌ Erro ao processar operação ${operation.type}:`, error);
-        
+        console.error(
+          `❌ Erro ao processar operação ${operation.type}:`,
+          error
+        );
+
         operation.retryCount++;
         if (operation.retryCount >= operation.maxRetries) {
           console.log(`🚫 Operação ${operation.id} excedeu tentativas máximas`);
@@ -100,7 +114,9 @@ class OfflineQueueService {
     }
 
     // Remover operações processadas da fila
-    this.queue = this.queue.filter(op => !processedOperations.includes(op.id));
+    this.queue = this.queue.filter(
+      (op) => !processedOperations.includes(op.id)
+    );
     await this.saveQueue();
 
     // Salvar operações que falharam definitivamente
@@ -108,41 +124,79 @@ class OfflineQueueService {
       await this.saveFailedOperations(failedOperations);
     }
 
-    console.log(`✅ Processamento da fila concluído. Restantes: ${this.queue.length}`);
+    console.log(
+      `✅ Processamento da fila concluído. Restantes: ${this.queue.length}`
+    );
     this.isProcessing = false;
   }
 
   private async executeOperation(operation: OfflineOperation) {
-    const { ChampionshipService } = await import('./championshipService');
-    
+    const { ChampionshipService } = await import("./championshipService");
+    const dataModule = await import("./dataService");
+    const dataService = (dataModule as any).dataService;
+
     switch (operation.type) {
-      case 'championship_update':
-        await ChampionshipService.updateChampionship(operation.data, false);
+      case "championship_update":
+        // Pode representar diferentes payloads: campeonato completo, players ou teams
+        if (operation.data) {
+          if (operation.data.players) {
+            await dataService.savePlayers(operation.data.players);
+          }
+          if (operation.data.teams) {
+            await dataService.saveTeams(operation.data.teams);
+          }
+          if (operation.data.championship) {
+            await ChampionshipService.updateChampionship(
+              operation.data.championship,
+              false
+            );
+          }
+        }
         break;
-      
-      case 'championship_create':
-        await ChampionshipService.createChampionship(operation.data.name, operation.data.type);
+
+      case "championship_create":
+        if (operation.data && (operation.data.id || operation.data.name)) {
+          await ChampionshipService.createChampionshipFromData(operation.data);
+        } else {
+          await ChampionshipService.createChampionship(
+            operation.data.name,
+            operation.data.type
+          );
+        }
         break;
-      
-      case 'championship_delete':
+
+      case "championship_delete":
         await ChampionshipService.deleteChampionship(operation.data.id);
         break;
-      
-      case 'match_result':
-        await ChampionshipService.recordMatchResult(
-          operation.data.championshipId,
-          operation.data.matchId,
-          operation.data.homeScore,
-          operation.data.awayScore,
-          operation.data.homeGoalScorers,
-          operation.data.awayGoalScorers
-        );
+
+      case "match_result":
+        // Suporta tanto um único resultado quanto um array enfileirado
+        if (operation.data && operation.data.results) {
+          await dataService.saveGameResults(operation.data.results);
+        } else {
+          await ChampionshipService.recordMatchResult(
+            operation.data.championshipId,
+            operation.data.matchId,
+            operation.data.homeScore,
+            operation.data.awayScore,
+            operation.data.homeGoalScorers,
+            operation.data.awayGoalScorers
+          );
+        }
         break;
-      
-      case 'user_preference':
-        await ChampionshipService.setCurrentChampionship(operation.data.championshipId);
+
+      case "user_preference":
+        if (operation.data && operation.data.distributions) {
+          await dataService.saveSavedDistributions(
+            operation.data.distributions
+          );
+        } else if (operation.data && operation.data.championshipId) {
+          await ChampionshipService.setCurrentChampionship(
+            operation.data.championshipId
+          );
+        }
         break;
-      
+
       default:
         throw new Error(`Tipo de operação não suportado: ${operation.type}`);
     }
@@ -153,9 +207,12 @@ class OfflineQueueService {
       const existingFailed = await AsyncStorage.getItem(FAILED_OPERATIONS_KEY);
       const failedOps = existingFailed ? JSON.parse(existingFailed) : [];
       failedOps.push(...operations);
-      await AsyncStorage.setItem(FAILED_OPERATIONS_KEY, JSON.stringify(failedOps));
+      await AsyncStorage.setItem(
+        FAILED_OPERATIONS_KEY,
+        JSON.stringify(failedOps)
+      );
     } catch (error) {
-      console.error('Erro ao salvar operações falhadas:', error);
+      console.error("Erro ao salvar operações falhadas:", error);
     }
   }
 
@@ -163,13 +220,13 @@ class OfflineQueueService {
     return {
       pendingOperations: this.queue.length,
       isProcessing: this.isProcessing,
-      operations: this.queue.map(op => ({
+      operations: this.queue.map((op) => ({
         id: op.id,
         type: op.type,
         timestamp: op.timestamp,
         retryCount: op.retryCount,
-        maxRetries: op.maxRetries
-      }))
+        maxRetries: op.maxRetries,
+      })),
     };
   }
 
@@ -178,7 +235,7 @@ class OfflineQueueService {
       const data = await AsyncStorage.getItem(FAILED_OPERATIONS_KEY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('Erro ao obter operações falhadas:', error);
+      console.error("Erro ao obter operações falhadas:", error);
       return [];
     }
   }
@@ -187,7 +244,7 @@ class OfflineQueueService {
     try {
       await AsyncStorage.removeItem(FAILED_OPERATIONS_KEY);
     } catch (error) {
-      console.error('Erro ao limpar operações falhadas:', error);
+      console.error("Erro ao limpar operações falhadas:", error);
     }
   }
 
@@ -195,11 +252,11 @@ class OfflineQueueService {
     const failedOps = await this.getFailedOperations();
     if (failedOps.length > 0) {
       // Resetar contador de tentativas e adicionar de volta à fila
-      const retriedOps = failedOps.map(op => ({ ...op, retryCount: 0 }));
+      const retriedOps = failedOps.map((op) => ({ ...op, retryCount: 0 }));
       this.queue.push(...retriedOps);
       await this.saveQueue();
       await this.clearFailedOperations();
-      
+
       if (connectivityService.isOnline()) {
         this.processQueue();
       }
@@ -210,7 +267,7 @@ class OfflineQueueService {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
     }
-    
+
     this.syncInterval = setInterval(() => {
       if (connectivityService.isOnline() && this.queue.length > 0) {
         this.processQueue();

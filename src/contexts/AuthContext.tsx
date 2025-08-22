@@ -6,9 +6,10 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import NetInfo from '@react-native-community/netinfo';
+import NetInfo from "@react-native-community/netinfo";
 import { auth } from "../config/firebaseConfig";
 import useFirebaseAuthPersistence from "../hooks/useFirebaseAuthPersistence";
+import { useConnectivity } from "../hooks/useConnectivity";
 
 interface AuthContextType {
   user: User | null;
@@ -38,13 +39,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const { forceCheck } = useConnectivity();
 
   // Configurar persistência do Firebase Auth
   useFirebaseAuthPersistence();
 
   useEffect(() => {
+    // Forçar checagem de conectividade ao inicializar o provedor
+    try {
+      forceCheck();
+    } catch (err) {
+      console.warn("Erro ao forçar checagem de conectividade:", err);
+    }
     // Monitorar conectividade
-    const unsubscribeNetInfo = NetInfo.addEventListener(state => {
+    const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
       setIsOffline(!state.isConnected);
     });
 
@@ -63,13 +71,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (isConnected && storedEmail && storedPassword) {
           // Online: tentar fazer login silencioso
           try {
-            const result = await signInWithEmailAndPassword(auth, storedEmail, storedPassword);
+            const result = await signInWithEmailAndPassword(
+              auth,
+              storedEmail,
+              storedPassword
+            );
             // Salvar dados do usuário para uso offline
             const userData = {
               uid: result.user.uid,
               email: result.user.email,
               displayName: result.user.displayName,
-              lastLogin: new Date().toISOString()
+              lastLogin: new Date().toISOString(),
             };
             await AsyncStorage.setItem("userData", JSON.stringify(userData));
           } catch (error) {
@@ -84,24 +96,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 displayName: userData.displayName,
                 phoneNumber: null,
                 photoURL: null,
-                providerId: 'offline',
+                providerId: "offline",
                 emailVerified: true,
                 isAnonymous: false,
                 metadata: {},
                 providerData: [],
-                refreshToken: '',
+                refreshToken: "",
                 tenantId: null,
                 delete: async () => {},
-                getIdToken: async () => '',
+                getIdToken: async () => "",
                 getIdTokenResult: async () => ({} as any),
                 reload: async () => {},
-                toJSON: () => ({})
+                toJSON: () => ({}),
               } as User;
+              // Expor usuário offline em memória para serviços que achem necessário
+              (globalThis as any).offlineUser = offlineUser;
               setUser(offlineUser);
               console.log("Usando autenticação offline");
             } else {
               // Limpar dados inválidos
-              await AsyncStorage.multiRemove(["userEmail", "userPassword", "userData"]);
+              await AsyncStorage.multiRemove([
+                "userEmail",
+                "userPassword",
+                "userData",
+              ]);
             }
           }
         } else if (!isConnected && storedUserData) {
@@ -113,19 +131,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             displayName: userData.displayName,
             phoneNumber: null,
             photoURL: null,
-            providerId: 'offline',
+            providerId: "offline",
             emailVerified: true,
             isAnonymous: false,
             metadata: {},
             providerData: [],
-            refreshToken: '',
+            refreshToken: "",
             tenantId: null,
             delete: async () => {},
-            getIdToken: async () => '',
+            getIdToken: async () => "",
             getIdTokenResult: async () => ({} as any),
             reload: async () => {},
-            toJSON: () => ({})
+            toJSON: () => ({}),
           } as User;
+          (globalThis as any).offlineUser = offlineUser;
           setUser(offlineUser);
           console.log("Modo offline: usuário autenticado localmente");
         }
@@ -147,11 +166,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
-            lastLogin: new Date().toISOString()
+            lastLogin: new Date().toISOString(),
           };
           await AsyncStorage.setItem("userData", JSON.stringify(userData));
         }
         setUser(user);
+        if (!user) {
+          try {
+            delete (globalThis as any).offlineUser;
+          } catch (e) {}
+        }
         setLoading(false);
       },
       (error) => {
@@ -207,7 +231,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(null);
       // Limpar todos os dados salvos (incluindo dados offline)
       await AsyncStorage.multiRemove(["userEmail", "userPassword", "userData"]);
-      
+
       // Verificar conectividade antes de tentar logout online
       const netInfo = await NetInfo.fetch();
       if (netInfo.isConnected) {
@@ -215,6 +239,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         // Modo offline: apenas limpar estado local
         setUser(null);
+        try {
+          delete (globalThis as any).offlineUser;
+        } catch (e) {}
       }
     } catch (error) {
       setError("Erro ao fazer logout");

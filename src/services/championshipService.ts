@@ -83,7 +83,11 @@ export class ChampionshipService {
 
   // Obter ID do usuário atual
   private static getUserId(): string | null {
-    return auth.currentUser?.uid || null;
+    // Primeiro tentar o usuário autenticado do Firebase,
+    // em seguida verificar um usuário em memória (modo offline) exposto via globalThis
+    return (
+      auth.currentUser?.uid || (globalThis as any)?.offlineUser?.uid || null
+    );
   }
   // Carregar todos os campeonatos
   static async getAllChampionships(): Promise<Championship[]> {
@@ -95,7 +99,7 @@ export class ChampionshipService {
       }
 
       const isOnline = await this.isOnline();
-      
+
       if (isOnline) {
         // Online: buscar do Firebase e atualizar cache
         console.log("🔄 Buscando campeonatos diretamente do Firebase...");
@@ -123,7 +127,10 @@ export class ChampionshipService {
             matches: data.matches || [],
             createdAt: data.createdAt || new Date().toISOString(),
             updatedAt: data.updatedAt || new Date().toISOString(),
-            champion: typeof data.champion === "string" ? data.champion : (data.champion?.name || ""),
+            champion:
+              typeof data.champion === "string"
+                ? data.champion
+                : data.champion?.name || "",
           };
 
           // Se o ID foi corrigido, atualizar no Firebase
@@ -137,7 +144,10 @@ export class ChampionshipService {
 
         // Atualizar cache local
         try {
-          await AsyncStorage.setItem(CHAMPIONSHIPS_KEY, JSON.stringify(championships));
+          await AsyncStorage.setItem(
+            CHAMPIONSHIPS_KEY,
+            JSON.stringify(championships)
+          );
           console.log("💾 Cache local atualizado com dados do Firebase");
         } catch (cacheError) {
           console.warn("⚠️ Erro ao atualizar cache local:", cacheError);
@@ -195,45 +205,52 @@ export class ChampionshipService {
       }
 
       const isOnline = await this.isOnline();
-      
+
       if (isOnline) {
         // Online: salvar no Firebase e atualizar cache local
         console.log("💾 Salvando campeonatos no Firebase...");
         for (const championship of championships) {
           const safeChampionship = {
             ...championship,
-          teams: championship.teams || [],
-          matches: championship.matches || [],
-          createdAt: championship.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+            teams: championship.teams || [],
+            matches: championship.matches || [],
+            createdAt: championship.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
 
-        const championshipData = this.cleanUndefinedFields({
-          ...safeChampionship,
-          userId,
-          updatedAt: new Date().toISOString(),
-        });
+          const championshipData = this.cleanUndefinedFields({
+            ...safeChampionship,
+            userId,
+            updatedAt: new Date().toISOString(),
+          });
 
-        const isFirebaseId = championship.id && !/^\d+$/.test(championship.id);
+          const isFirebaseId =
+            championship.id && !/^\d+$/.test(championship.id);
 
-        if (isFirebaseId) {
-          const championshipRef = doc(db, "championships", championship.id);
-          await setDoc(championshipRef, championshipData);
-          console.log("🔄 Campeonato atualizado no Firebase:", championship.id);
-        } else {
-          const newChampionshipRef = doc(collection(db, "championships"));
-          championship.id = newChampionshipRef.id;
-          await setDoc(newChampionshipRef, championshipData);
-          console.log(
-            "✅ Novo campeonato criado no Firebase:",
-            championship.id
-          );
+          if (isFirebaseId) {
+            const championshipRef = doc(db, "championships", championship.id);
+            await setDoc(championshipRef, championshipData);
+            console.log(
+              "🔄 Campeonato atualizado no Firebase:",
+              championship.id
+            );
+          } else {
+            const newChampionshipRef = doc(collection(db, "championships"));
+            championship.id = newChampionshipRef.id;
+            await setDoc(newChampionshipRef, championshipData);
+            console.log(
+              "✅ Novo campeonato criado no Firebase:",
+              championship.id
+            );
+          }
         }
-        }
-        
+
         // Atualizar cache local após salvar no Firebase
         try {
-          await AsyncStorage.setItem(CHAMPIONSHIPS_KEY, JSON.stringify(championships));
+          await AsyncStorage.setItem(
+            CHAMPIONSHIPS_KEY,
+            JSON.stringify(championships)
+          );
           console.log("📦 Cache local atualizado com sucesso");
         } catch (cacheError) {
           console.warn("⚠️ Erro ao atualizar cache local:", cacheError);
@@ -241,18 +258,21 @@ export class ChampionshipService {
       } else {
         // Offline: adicionar à fila e salvar no cache local
         console.log("📱 Offline - adicionando operação à fila...");
-        
+
         for (const championship of championships) {
           await offlineQueueService.addOperation({
-            type: 'championship_update',
+            type: "championship_update",
             data: championship,
-            maxRetries: 3
+            maxRetries: 3,
           });
         }
-        
+
         // Salvar no cache local
         try {
-          await AsyncStorage.setItem(CHAMPIONSHIPS_KEY, JSON.stringify(championships));
+          await AsyncStorage.setItem(
+            CHAMPIONSHIPS_KEY,
+            JSON.stringify(championships)
+          );
           console.log("📦 Campeonatos salvos no cache local (offline)");
         } catch (cacheError) {
           console.error("❌ Erro ao salvar no cache local:", cacheError);
@@ -315,9 +335,9 @@ export class ChampionshipService {
       await offlineQueueService.addOperation({
         type: "championship_create",
         data: championshipData,
-        maxRetries: 3
+        maxRetries: 3,
       });
-      
+
       // Salvar localmente para uso imediato
       const localChampionships = await this.getAllChampionships();
       localChampionships.push(newChampionship);
@@ -326,6 +346,46 @@ export class ChampionshipService {
     }
 
     return newChampionship;
+  }
+
+  // Criar campeonato no Firebase usando dados já gerados (usado pela fila offline)
+  static async createChampionshipFromData(
+    championshipData: any
+  ): Promise<void> {
+    console.log(
+      "💾 Criando campeonato no Firebase a partir de dados offline:",
+      championshipData.id
+    );
+
+    const userId = this.getUserId();
+    if (!userId) {
+      throw new Error("Usuário não autenticado");
+    }
+
+    const isOnline = await this.isOnline();
+    if (!isOnline) {
+      throw new Error("Não é possível criar campeonato no Firebase - offline");
+    }
+
+    try {
+      // Garantir que o documento seja criado com o mesmo ID usado offline
+      const ref = doc(db, "championships", championshipData.id);
+      const payload = this.cleanUndefinedFields({
+        ...championshipData,
+        userId,
+      });
+      await setDoc(ref, payload);
+      console.log(
+        "✅ Campeonato criado no Firebase a partir do cache:",
+        championshipData.id
+      );
+    } catch (error) {
+      console.error(
+        "❌ Erro ao criar campeonato no Firebase a partir do cache:",
+        error
+      );
+      throw error;
+    }
   }
 
   // Obter campeonato por ID
@@ -350,7 +410,10 @@ export class ChampionshipService {
           return {
             id: championshipDoc.id,
             ...championshipData,
-            champion: typeof championshipData.champion === "string" ? championshipData.champion : (championshipData.champion?.name || ""),
+            champion:
+              typeof championshipData.champion === "string"
+                ? championshipData.champion
+                : championshipData.champion?.name || "",
           } as Championship;
         }
       }
@@ -416,7 +479,7 @@ export class ChampionshipService {
     updatedChampionship.updatedAt = currentDate;
 
     const isOnline = await this.isOnline();
-    
+
     // Preparar dados para salvar
     const championshipData = this.cleanUndefinedFields({
       ...updatedChampionship,
@@ -498,15 +561,17 @@ export class ChampionshipService {
       }
     } else {
       // Modo offline: adicionar à fila e salvar localmente
-      console.log("📱 Service: Offline - adicionando à fila e salvando localmente");
-      
+      console.log(
+        "📱 Service: Offline - adicionando à fila e salvando localmente"
+      );
+
       // Adicionar à fila offline
       await offlineQueueService.addOperation({
         type: "championship_update",
         data: championshipData,
-        maxRetries: 3
+        maxRetries: 3,
       });
-      
+
       // Salvar localmente para uso imediato
       const championships = await this.getAllChampionships();
       const index = championships.findIndex(
@@ -519,7 +584,9 @@ export class ChampionshipService {
           CHAMPIONSHIPS_KEY,
           JSON.stringify(championships)
         );
-        console.log("✅ Service: Cache local atualizado e operação adicionada à fila offline!");
+        console.log(
+          "✅ Service: Cache local atualizado e operação adicionada à fila offline!"
+        );
       }
     }
   }
@@ -535,7 +602,7 @@ export class ChampionshipService {
     }
 
     const isOnline = await this.isOnline();
-    
+
     if (isOnline) {
       // Online: deletar do Firebase e atualizar cache
       const championshipRef = doc(db, "championships", id);
@@ -546,18 +613,26 @@ export class ChampionshipService {
         if (championshipData.userId === userId) {
           await deleteDoc(championshipRef);
           console.log("🗑️ Campeonato deletado do Firebase:", id);
-          
+
           // Atualizar cache local removendo o campeonato
           try {
             const cachedData = await AsyncStorage.getItem(CHAMPIONSHIPS_KEY);
             if (cachedData) {
               const championships = JSON.parse(cachedData) as Championship[];
-              const updatedChampionships = championships.filter(c => c.id !== id);
-              await AsyncStorage.setItem(CHAMPIONSHIPS_KEY, JSON.stringify(updatedChampionships));
+              const updatedChampionships = championships.filter(
+                (c) => c.id !== id
+              );
+              await AsyncStorage.setItem(
+                CHAMPIONSHIPS_KEY,
+                JSON.stringify(updatedChampionships)
+              );
               console.log("📦 Cache local atualizado após deleção");
             }
           } catch (cacheError) {
-            console.warn("⚠️ Erro ao atualizar cache após deleção:", cacheError);
+            console.warn(
+              "⚠️ Erro ao atualizar cache após deleção:",
+              cacheError
+            );
           }
         } else {
           throw new Error("Campeonato não pertence ao usuário atual");
@@ -566,20 +641,23 @@ export class ChampionshipService {
     } else {
       // Offline: adicionar à fila e marcar como deletado no cache
       console.log("📱 Offline - adicionando deleção à fila...");
-      
+
       await offlineQueueService.addOperation({
-        type: 'championship_delete',
+        type: "championship_delete",
         data: { id },
-        maxRetries: 3
+        maxRetries: 3,
       });
-      
+
       // Remover do cache local
       try {
         const cachedData = await AsyncStorage.getItem(CHAMPIONSHIPS_KEY);
         if (cachedData) {
           const championships = JSON.parse(cachedData) as Championship[];
-          const updatedChampionships = championships.filter(c => c.id !== id);
-          await AsyncStorage.setItem(CHAMPIONSHIPS_KEY, JSON.stringify(updatedChampionships));
+          const updatedChampionships = championships.filter((c) => c.id !== id);
+          await AsyncStorage.setItem(
+            CHAMPIONSHIPS_KEY,
+            JSON.stringify(updatedChampionships)
+          );
           console.log("📦 Campeonato removido do cache local (offline)");
         }
       } catch (cacheError) {
@@ -605,7 +683,7 @@ export class ChampionshipService {
     }
 
     const isOnline = await this.isOnline();
-    
+
     if (isOnline) {
       // Online: salvar no Firebase e atualizar cache
       try {
@@ -631,18 +709,21 @@ export class ChampionshipService {
           },
           { merge: true }
         );
-        
+
         // Atualizar cache local com o campeonato
         try {
           const championship = await this.getChampionshipById(championshipId);
           if (championship) {
-            await AsyncStorage.setItem(CURRENT_CHAMPIONSHIP_KEY, JSON.stringify(championship));
+            await AsyncStorage.setItem(
+              CURRENT_CHAMPIONSHIP_KEY,
+              JSON.stringify(championship)
+            );
             console.log("💾 Cache do campeonato atual atualizado");
           }
         } catch (cacheError) {
           console.warn("⚠️ Erro ao atualizar cache:", cacheError);
         }
-        
+
         console.log("✅ Service: Campeonato atual definido no Firebase!");
       } catch (error) {
         console.error("❌ Service: Erro ao salvar no Firebase:", error);
@@ -651,29 +732,32 @@ export class ChampionshipService {
     } else {
       // Offline: adicionar à fila e salvar localmente
       console.log("📱 Service: Offline - adicionando à fila de operações...");
-      
+
       try {
         // Adicionar operação à fila offline
         await offlineQueueService.addOperation({
-            type: 'user_preference',
-            data: {
-              currentChampionshipId: championshipId,
-              updatedAt: new Date().toISOString(),
-            },
-            maxRetries: 3
-          });
-        
+          type: "user_preference",
+          data: {
+            currentChampionshipId: championshipId,
+            updatedAt: new Date().toISOString(),
+          },
+          maxRetries: 3,
+        });
+
         // Tentar carregar o campeonato do cache para salvar como atual
         const championships = await this.getAllChampionships();
-        const championship = championships.find(c => c.id === championshipId);
-        
+        const championship = championships.find((c) => c.id === championshipId);
+
         if (championship) {
-          await AsyncStorage.setItem(CURRENT_CHAMPIONSHIP_KEY, JSON.stringify(championship));
+          await AsyncStorage.setItem(
+            CURRENT_CHAMPIONSHIP_KEY,
+            JSON.stringify(championship)
+          );
           console.log("💾 Campeonato atual salvo no cache offline");
         } else {
           console.warn("⚠️ Campeonato não encontrado no cache local");
         }
-        
+
         console.log("📦 Service: Operação adicionada à fila offline");
       } catch (error) {
         console.error("❌ Service: Erro ao processar offline:", error);
@@ -693,7 +777,7 @@ export class ChampionshipService {
     }
 
     const isOnline = await this.isOnline();
-    
+
     if (isOnline) {
       // Online: buscar do Firebase e atualizar cache
       try {
@@ -704,7 +788,10 @@ export class ChampionshipService {
         if (userPrefsDoc.exists()) {
           const userData = userPrefsDoc.data();
           const currentId = userData.currentChampionshipId || null;
-          console.log("📋 Service: CurrentChampionshipId encontrado:", currentId);
+          console.log(
+            "📋 Service: CurrentChampionshipId encontrado:",
+            currentId
+          );
 
           if (
             currentId &&
@@ -713,17 +800,23 @@ export class ChampionshipService {
           ) {
             console.log("🔄 Service: Carregando dados do campeonato...");
             const championship = await this.getChampionshipById(currentId);
-            
+
             if (championship) {
               // Atualizar cache local
               try {
-                await AsyncStorage.setItem(CURRENT_CHAMPIONSHIP_KEY, JSON.stringify(championship));
+                await AsyncStorage.setItem(
+                  CURRENT_CHAMPIONSHIP_KEY,
+                  JSON.stringify(championship)
+                );
                 console.log("💾 Cache do campeonato atual atualizado");
               } catch (cacheError) {
-                console.warn("⚠️ Erro ao atualizar cache do campeonato atual:", cacheError);
+                console.warn(
+                  "⚠️ Erro ao atualizar cache do campeonato atual:",
+                  cacheError
+                );
               }
             }
-            
+
             console.log(
               "✅ Service: Campeonato carregado:",
               championship?.name || "null"
@@ -743,7 +836,9 @@ export class ChampionshipService {
         );
         // Fallback para cache em caso de erro
         try {
-          const cachedData = await AsyncStorage.getItem(CURRENT_CHAMPIONSHIP_KEY);
+          const cachedData = await AsyncStorage.getItem(
+            CURRENT_CHAMPIONSHIP_KEY
+          );
           if (cachedData) {
             const championship = JSON.parse(cachedData) as Championship;
             console.log(
@@ -759,7 +854,9 @@ export class ChampionshipService {
       }
     } else {
       // Offline: usar cache local
-      console.log("📱 Service: Offline - carregando campeonato atual do cache...");
+      console.log(
+        "📱 Service: Offline - carregando campeonato atual do cache..."
+      );
       try {
         const cachedData = await AsyncStorage.getItem(CURRENT_CHAMPIONSHIP_KEY);
         if (cachedData) {
@@ -770,11 +867,16 @@ export class ChampionshipService {
           );
           return championship;
         } else {
-          console.log("📦 Service: Nenhum campeonato atual encontrado no cache");
+          console.log(
+            "📦 Service: Nenhum campeonato atual encontrado no cache"
+          );
           return null;
         }
       } catch (cacheError) {
-        console.error("❌ Service: Erro ao carregar cache do campeonato atual:", cacheError);
+        console.error(
+          "❌ Service: Erro ao carregar cache do campeonato atual:",
+          cacheError
+        );
         return null;
       }
     }
@@ -1242,35 +1344,41 @@ export class ChampionshipService {
     });
 
     const isOnline = await this.isOnline();
-    
+
     if (isOnline) {
       // Forçar recarregamento ao registrar resultado quando online
       await this.updateChampionship(championship, true /* forceReload */);
     } else {
       // Quando offline, adicionar à fila e salvar localmente
       await offlineQueueService.addOperation({
-        type: 'match_result',
+        type: "match_result",
         data: {
           championshipId,
           matchId,
           homeScore,
           awayScore,
           homeGoalScorers,
-          awayGoalScorers
+          awayGoalScorers,
         },
-        maxRetries: 3
+        maxRetries: 3,
       });
-      
+
       // Salvar o campeonato atualizado no cache local
       try {
         const allChampionships = await this.getAllChampionships();
-        const updatedChampionships = allChampionships.map(c => 
+        const updatedChampionships = allChampionships.map((c) =>
           c.id === championshipId ? championship : c
         );
-        await AsyncStorage.setItem(CHAMPIONSHIPS_KEY, JSON.stringify(updatedChampionships));
+        await AsyncStorage.setItem(
+          CHAMPIONSHIPS_KEY,
+          JSON.stringify(updatedChampionships)
+        );
         console.log("💾 Service: Resultado salvo no cache local (offline)");
       } catch (error) {
-        console.error("❌ Service: Erro ao salvar resultado no cache local:", error);
+        console.error(
+          "❌ Service: Erro ao salvar resultado no cache local:",
+          error
+        );
       }
     }
 
@@ -1482,33 +1590,46 @@ export class ChampionshipService {
           });
         }
       }
-      
+
       // Embaralhar as combinações para sorteio aleatório
-      const shuffledMatchups = [...allPossibleMatchups].sort(() => Math.random() - 0.5);
+      const shuffledMatchups = [...allPossibleMatchups].sort(
+        () => Math.random() - 0.5
+      );
       console.log(`🎲 Combinações possíveis: ${shuffledMatchups.length}`);
-      
+
       // Selecionar apenas o número de jogos necessários
-      const selectedMatchups = shuffledMatchups.slice(0, Math.min(totalGames, shuffledMatchups.length));
+      const selectedMatchups = shuffledMatchups.slice(
+        0,
+        Math.min(totalGames, shuffledMatchups.length)
+      );
       console.log(`✅ Jogos selecionados: ${selectedMatchups.length}`);
-      
+
       // Distribuir os jogos pelas rodadas
-      const baseGamesPerRound = Math.floor(selectedMatchups.length / config.totalRounds);
+      const baseGamesPerRound = Math.floor(
+        selectedMatchups.length / config.totalRounds
+      );
       const extraGames = selectedMatchups.length % config.totalRounds;
-      
+
       let matchupIndex = 0;
-      
+
       for (let round = 1; round <= config.totalRounds; round++) {
-        const gamesInThisRound = baseGamesPerRound + (round <= extraGames ? 1 : 0);
+        const gamesInThisRound =
+          baseGamesPerRound + (round <= extraGames ? 1 : 0);
         console.log(`\n📅 Rodada ${round}: ${gamesInThisRound} jogos`);
-        
-        for (let game = 0; game < gamesInThisRound && matchupIndex < selectedMatchups.length; game++) {
+
+        for (
+          let game = 0;
+          game < gamesInThisRound && matchupIndex < selectedMatchups.length;
+          game++
+        ) {
           const matchup = selectedMatchups[matchupIndex];
-          
+
           // Sortear mando de campo
-          const [homeTeam, awayTeam] = Math.random() < 0.5 
-            ? [matchup.team1, matchup.team2] 
-            : [matchup.team2, matchup.team1];
-          
+          const [homeTeam, awayTeam] =
+            Math.random() < 0.5
+              ? [matchup.team1, matchup.team2]
+              : [matchup.team2, matchup.team1];
+
           matches.push({
             id: `game_${Date.now()}_${matchId++}`,
             homeTeam: homeTeam.id,
@@ -1519,54 +1640,62 @@ export class ChampionshipService {
             round: round,
             matchOrder: game + 1,
           });
-          
-          console.log(`  ⚽ Jogo ${game + 1}: ${homeTeam.name} vs ${awayTeam.name} (mando: ${homeTeam.name})`);
+
+          console.log(
+            `  ⚽ Jogo ${game + 1}: ${homeTeam.name} vs ${
+              awayTeam.name
+            } (mando: ${homeTeam.name})`
+          );
           matchupIndex++;
         }
       }
     } else {
       // MODO PADRÃO (sem configuração personalizada)
       console.log("🏆 Gerando jogos no modo padrão (todos contra todos)");
-      
+
       // Embaralhar times para sorteio da ordem dos confrontos
       const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
       console.log(
         "🎲 Ordem sorteada para confrontos:",
         shuffledTeams.map((t) => t.name)
       );
-      
+
       // Calcular número de rodadas necessárias
       const totalTeams = teams.length;
       const totalRounds = totalTeams - 1; // Número mínimo de rodadas para todos jogarem entre si
-      
+
       // Gerar jogos - todos contra todos (1 vez)
       console.log("\n🔄 === GERANDO JOGOS ===");
-      
+
       // Algoritmo para distribuir jogos em rodadas (Round Robin)
       // Baseado no algoritmo de Circle Method
       const teamsForAlgorithm = [...shuffledTeams];
       if (totalTeams % 2 === 1) {
         // Adicionar um time "fantasma" para parear
-        teamsForAlgorithm.push({ id: "bye", name: "Bye", color: "#000000", players: [] });
+        teamsForAlgorithm.push({
+          id: "bye",
+          name: "Bye",
+          color: "#000000",
+          players: [],
+        });
       }
-      
+
       const n = teamsForAlgorithm.length;
-      
+
       for (let round = 1; round <= totalRounds; round++) {
         console.log(`\n📅 Rodada ${round}:`);
         let gamesInRound = 0;
-        
+
         for (let i = 0; i < n / 2; i++) {
           const team1 = teamsForAlgorithm[i];
           const team2 = teamsForAlgorithm[n - 1 - i];
-          
+
           // Ignorar jogos com o time "fantasma"
           if (team1.id !== "bye" && team2.id !== "bye") {
             // Sortear mando de campo
-            const [homeTeam, awayTeam] = Math.random() < 0.5 
-              ? [team1, team2] 
-              : [team2, team1];
-            
+            const [homeTeam, awayTeam] =
+              Math.random() < 0.5 ? [team1, team2] : [team2, team1];
+
             matches.push({
               id: `game_${Date.now()}_${matchId++}`,
               homeTeam: homeTeam.id,
@@ -1577,20 +1706,24 @@ export class ChampionshipService {
               round: round,
               matchOrder: gamesInRound + 1,
             });
-            
-            console.log(`  ⚽ Jogo ${gamesInRound + 1}: ${homeTeam.name} vs ${awayTeam.name} (mando: ${homeTeam.name})`);
+
+            console.log(
+              `  ⚽ Jogo ${gamesInRound + 1}: ${homeTeam.name} vs ${
+                awayTeam.name
+              } (mando: ${homeTeam.name})`
+            );
             gamesInRound++;
           }
         }
-        
+
         // Rotacionar os times para a próxima rodada (mantendo o primeiro fixo)
         const firstTeam = teamsForAlgorithm[0];
         const lastTeam = teamsForAlgorithm[n - 1];
-        
+
         for (let i = n - 1; i > 1; i--) {
           teamsForAlgorithm[i] = teamsForAlgorithm[i - 1];
         }
-        
+
         teamsForAlgorithm[1] = lastTeam;
       }
     }
@@ -2143,11 +2276,11 @@ export class ChampionshipService {
       if (winners.length === 1) {
         const champion = championship.teams.find((t) => t.id === winners[0]);
         console.log(`👑 CAMPEÃO: ${champion?.name}`);
-        
+
         // Marcar o campeonato como finalizado
         championship.status = "finalizado";
         championship.champion = champion?.name || "";
-        
+
         console.log(`✅ Campeonato finalizado com sucesso!`);
         console.log(`🏆 Campeão oficial: ${champion?.name}`);
       } else {
