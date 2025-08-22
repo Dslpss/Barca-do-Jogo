@@ -26,7 +26,7 @@ export default function AppHeader({
   onSync,
   syncLoading = false,
 }: AppHeaderProps) {
-  const { signOut, user } = useAuth();
+  const { signOut, user, isOffline } = useAuth();
 
   const handleLogout = () => {
     Alert.alert("Sair", "Tem certeza que deseja sair do aplicativo?", [
@@ -52,18 +52,25 @@ export default function AppHeader({
     <View style={styles.headerContainer}>
       {/* Botões superiores */}
       <View style={styles.headerButtons}>
+        {/* Indicador offline */}
+        {isOffline && (
+          <View style={[styles.headerButton, styles.offlineIndicator]}>
+            <Ionicons name="cloud-offline-outline" size={20} color="#FF6B6B" />
+          </View>
+        )}
+
         {/* Botão de sincronização */}
         {showSync && user && onSync && (
           <TouchableOpacity
             style={[styles.headerButton, styles.syncButton]}
             onPress={handleSync}
-            disabled={syncLoading}
+            disabled={syncLoading || isOffline}
             accessibilityLabel="Sincronizar dados"
           >
             <Ionicons
               name={syncLoading ? "sync" : "cloud-upload-outline"}
               size={20}
-              color={theme === "dark" ? "#fff" : "#185a9d"}
+              color={isOffline ? "#ccc" : (theme === "dark" ? "#fff" : "#185a9d")}
               style={syncLoading ? { transform: [{ rotate: "360deg" }] } : {}}
             />
           </TouchableOpacity>
@@ -150,6 +157,11 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     // Estilos específicos do botão de logout se necessário
+  },
+  offlineIndicator: {
+    backgroundColor: "rgba(255, 107, 107, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 107, 107, 0.5)",
   },
   headerTitle: {
     fontSize: 26,

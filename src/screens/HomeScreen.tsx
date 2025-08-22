@@ -158,6 +158,43 @@ function HomeScreen() {
           )}
         </View>
 
+        {/* Card de Status de Conectividade */}
+        <View style={styles.connectivityContainer}>
+          <View style={styles.connectivityCard}>
+            <View style={styles.connectivityHeader}>
+              <Ionicons 
+                name={isOnline ? "wifi" : "cloud-offline-outline"} 
+                size={24} 
+                color={isOnline ? "#4CAF50" : "#FF5722"} 
+              />
+              <Text style={styles.connectivityTitle}>
+                {isOnline ? "Online" : "Modo Offline"}
+              </Text>
+            </View>
+            <Text style={styles.connectivityDescription}>
+              {isOnline 
+                ? "Conectado à internet. Dados sincronizados automaticamente." 
+                : "Sem conexão. Usando dados salvos localmente."}
+            </Text>
+            {!isOnline && (
+              <View style={styles.offlineWarning}>
+                <Ionicons name="information-circle" size={16} color="#FF9800" />
+                <Text style={styles.offlineWarningText}>
+                  Algumas funcionalidades podem estar limitadas
+                </Text>
+              </View>
+            )}
+            {lastSync && (
+              <Text style={styles.lastSyncText}>
+                Última sincronização: {lastSync.toLocaleTimeString('pt-BR', { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </Text>
+            )}
+          </View>
+        </View>
+
         {/* Cards de Estatísticas */}
         <View style={styles.statsContainer}>
           <Text style={styles.statsTitle}>📊 Estatísticas Gerais</Text>
@@ -527,6 +564,58 @@ const styles = StyleSheet.create({
     padding: 5,
     borderRadius: 5,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  // Connectivity Container
+  connectivityContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 25,
+  },
+  connectivityCard: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  connectivityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  connectivityTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  connectivityDescription: {
+    fontSize: 14,
+    color: "#fff",
+    opacity: 0.9,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  offlineWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255, 152, 0, 0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  offlineWarningText: {
+    fontSize: 12,
+    color: "#FF9800",
+    fontWeight: "500",
+    flex: 1,
+  },
+  lastSyncText: {
+    fontSize: 12,
+    color: "#fff",
+    opacity: 0.7,
+    fontStyle: "italic",
   },
   // Estilos para o botão de sorteio rápido
   quickDrawContainer: {
