@@ -273,7 +273,7 @@ const ChampionshipTableScreen = () => {
           </Text>
           {currentChampionship.status === "finalizado" && currentChampionship.champion ? (
             <Text style={styles.championInfo}>
-              🏆 Campeão: {currentChampionship.champion.name}
+              🏆 Campeão: {currentChampionship.teams.find(team => team.id === currentChampionship.champion)?.name || 'Time não encontrado'}
             </Text>
           ) : (
             <Text style={styles.matchesInfo}>

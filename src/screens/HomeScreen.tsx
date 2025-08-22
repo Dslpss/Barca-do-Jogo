@@ -21,7 +21,7 @@ import { useChampionship } from "../hooks/useChampionship";
 function HomeScreen() {
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const {
     players,
     teams,
@@ -100,6 +100,14 @@ function HomeScreen() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    }
+  };
+
   return (
     <LinearGradient
       colors={["#1e3c72", "#2a5298", "#4a90e2"]}
@@ -129,6 +137,25 @@ function HomeScreen() {
             isLoading={isLoading}
             lastSync={lastSync}
           />
+
+          {/* Informações do Usuário */}
+          {user && (
+            <View style={styles.userInfoContainer}>
+              <View style={styles.userInfo}>
+                <Ionicons name="person-circle" size={20} color="#fff" />
+                <Text style={styles.userText}>
+                  {user.displayName || user.email || 'Usuário'}
+                </Text>
+                <TouchableOpacity 
+                  style={styles.logoutButton}
+                  onPress={handleLogout}
+                  accessibilityLabel="Sair da conta"
+                >
+                  <Ionicons name="log-out-outline" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Cards de Estatísticas */}
@@ -475,6 +502,31 @@ const styles = StyleSheet.create({
   },
   rotating: {
     transform: [{ rotate: "360deg" }],
+  },
+  // Estilos para informações do usuário
+  userInfoContainer: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
+  },
+  userText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  logoutButton: {
+    marginLeft: 10,
+    padding: 5,
+    borderRadius: 5,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
   // Estilos para o botão de sorteio rápido
   quickDrawContainer: {

@@ -11,9 +11,11 @@ import {
 } from "../types/championship";
 import { ChampionshipService } from "../services/championshipService";
 import { useAuth } from "../contexts/AuthContext";
+import { useConnectivity } from "./useConnectivity";
 
 export const useChampionship = () => {
   const { user } = useAuth();
+  const { isOnline, lastKnownState } = useConnectivity();
   const [championships, setChampionships] = useState<Championship[]>([]);
   const [currentChampionship, setCurrentChampionship] =
     useState<Championship | null>(null);
@@ -745,11 +747,20 @@ export const useChampionship = () => {
     }
   }, [user]);
 
+  // Efeito para sincronização automática quando voltar online
+  useEffect(() => {
+    if (user && isOnline && lastKnownState && !lastKnownState.isOnline) {
+      console.log("🌐 Hook: Conectividade restaurada, sincronizando dados...");
+      syncData();
+    }
+  }, [user, isOnline, lastKnownState]);
+
   return {
     championships,
     currentChampionship,
     loading,
     error,
+    isOnline,
     loadChampionships,
     loadCurrentChampionship,
     forceReloadCurrentChampionship,
