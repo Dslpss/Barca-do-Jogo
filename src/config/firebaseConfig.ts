@@ -8,21 +8,13 @@ import {
 } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey:
-    process.env.EXPO_PUBLIC_FIREBASE_API_KEY ||
-    "AIzaSyAqvfTFpri7-quRf8uKf9lKjQElQuBUTu8",
-  authDomain:
-    process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ||
-    "anotacoes-estudos.firebaseapp.com",
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "anotacoes-estudos",
-  storageBucket:
-    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    "anotacoes-estudos.firebasestorage.app",
-  messagingSenderId:
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "730890275748",
-  appId:
-    process.env.EXPO_PUBLIC_FIREBASE_APP_ID ||
-    "1:730890275748:android:6bc3c230c25e69bef60f31",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY as string,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN as string,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID as string,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET as string,
+  messagingSenderId: process.env
+    .EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID as string,
 };
 
 // Validação das variáveis de ambiente com fallback para evitar crashes

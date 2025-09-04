@@ -7,12 +7,14 @@ import {
   SavedDistribution,
 } from "../services/dataService";
 import { useAuth } from "../contexts/AuthContext";
+import { useConnectivity } from "./useConnectivity";
 import { generateUniqueId } from "../utils/keyGenerator";
 
 export function useData() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  // Obter estado de conectividade a partir do hook compartilhado
+  const { isOnline } = useConnectivity();
 
   // Players
   const [players, setPlayersState] = useState<Player[]>([]);
@@ -87,7 +89,7 @@ export function useData() {
     // Atualizar o estado local imediatamente para feedback visual
     const updatedPlayers = players.filter((p) => p.id !== playerId);
     setPlayersState(updatedPlayers);
-    
+
     // Executar a remoção no Firebase em segundo plano
     try {
       await dataService.deletePlayer(playerId);
