@@ -1,6 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
 import { initializeAuth, getAuth, Auth } from "firebase/auth";
-import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 import {
   getFirestore,
   enableNetwork,
@@ -37,11 +36,13 @@ if (getApps().length === 0) {
 }
 
 // Initialize Auth
-// Note: Firebase v12 detecta automaticamente o AsyncStorage no React Native
+// Firebase v12 com React Native detecta automaticamente o AsyncStorage
 let auth: Auth;
 try {
+  // No React Native, o Firebase v12 detecta automaticamente o AsyncStorage
+  // se o pacote @react-native-async-storage/async-storage estiver instalado
   auth = initializeAuth(app);
-  console.log("✅ Firebase Auth inicializado");
+  console.log("✅ Firebase Auth inicializado com persistência automática");
 } catch (error: any) {
   // Se initializeAuth falhar (já foi inicializado), usar getAuth
   auth = getAuth(app);
