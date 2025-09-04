@@ -28,6 +28,11 @@ const CHAMPIONSHIPS_KEY = "championships";
 const CURRENT_CHAMPIONSHIP_KEY = "currentChampionship";
 
 export class ChampionshipService {
+  private static connectionStatus: "online" | "offline" | "unknown" = "unknown";
+  private static lastConnectivityCheck = 0;
+  private static connectivityCheckInterval = 30000; // 30 segundos
+  private static offlineMessageShown = false; // Flag para evitar logs repetitivos
+
   // Limpar campos undefined dos objetos antes de enviar ao Firebase
   private static cleanUndefinedFields(obj: any): any {
     if (obj === null || obj === undefined) {
@@ -74,13 +79,60 @@ export class ChampionshipService {
     return cleaned;
   }
 
-  // Verificar se está online
+  // Verificar se está online com cache
   private static async isOnline(): Promise<boolean> {
+    const now = Date.now();
+
+    // Usar cache de conectividade se a verificação foi recente
+    if (now - this.lastConnectivityCheck < this.connectivityCheckInterval) {
+      if (this.connectionStatus === "online") {
+        this.offlineMessageShown = false; // Reset flag quando online
+        return true;
+      }
+      if (this.connectionStatus === "offline") return false;
+    }
+
     try {
-      const testDoc = doc(db, "test", "connectivity");
-      await getDoc(testDoc);
+      // Método mais simples: tentar acessar uma coleção real
+      const userId = this.getUserId();
+      if (!userId) {
+        this.connectionStatus = "offline";
+        this.lastConnectivityCheck = now;
+        return false;
+      }
+
+      // Tentar buscar dados reais do usuário com timeout
+      const championshipsRef = collection(db, "championships");
+      const q = query(championshipsRef, where("userId", "==", userId));
+
+      // Criar uma Promise com timeout
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 5000)
+      );
+
+      await Promise.race([getDocs(q), timeoutPromise]);
+
+      this.connectionStatus = "online";
+      this.lastConnectivityCheck = now;
+      this.offlineMessageShown = false; // Reset flag quando conseguir conectar
       return true;
-    } catch (error) {
+    } catch (error: any) {
+      this.connectionStatus = "offline";
+      this.lastConnectivityCheck = now;
+
+      // Log apenas na primeira detecção de offline ou periodicamente
+      if (!this.offlineMessageShown) {
+        if (error.message === "timeout") {
+          console.log("📡 Status: Conexão lenta detectada - operando offline");
+        } else {
+          console.log(
+            "📡 Status: Operando offline -",
+            error.code || error.message
+          );
+        }
+        this.offlineMessageShown = true;
+      }
+
       return false;
     }
   }
@@ -89,6 +141,7 @@ export class ChampionshipService {
   private static getUserId(): string | null {
     return auth.currentUser?.uid || null;
   }
+
   // Carregar todos os campeonatos
   static async getAllChampionships(): Promise<Championship[]> {
     try {
@@ -99,7 +152,7 @@ export class ChampionshipService {
       }
 
       if (!(await this.isOnline())) {
-        console.log("Offline - não é possível buscar campeonatos");
+        // Mensagem já foi logada no método isOnline() se necessário
         return [];
       }
 
@@ -112,6 +165,22 @@ export class ChampionshipService {
       const championships: Championship[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
+
+        // Verificar se o campeonato tem estrutura válida primeiro
+        if (!data.userId) {
+          console.log(
+            "⚠️ Campeonato sem userId ignorado:",
+            doc.id,
+            "dados:",
+            data.name
+          );
+          return; // Pular este documento
+        }
+
+        if (data.userId !== userId) {
+          console.log("⚠️ Campeonato com userId diferente ignorado:", doc.id);
+          return; // Pular este documento
+        }
 
         // Verificar se o campeonato tem ID válido
         let championshipId = data.id || doc.id;
@@ -129,7 +198,10 @@ export class ChampionshipService {
           matches: data.matches || [],
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
-          champion: typeof data.champion === "string" ? data.champion : (data.champion?.name || ""),
+          champion:
+            typeof data.champion === "string"
+              ? data.champion
+              : data.champion?.name || "",
         };
 
         // Se o ID foi corrigido, atualizar no Firebase
@@ -215,7 +287,9 @@ export class ChampionshipService {
     }
 
     if (!(await this.isOnline())) {
-      throw new Error("Não é possível criar campeonato - offline");
+      throw new Error(
+        "Para criar um novo campeonato é necessário estar conectado à internet. Verifique sua conexão e tente novamente."
+      );
     }
 
     const currentDate = new Date().toISOString();
@@ -254,33 +328,62 @@ export class ChampionshipService {
 
   // Obter campeonato por ID
   static async getChampionshipById(id: string): Promise<Championship | null> {
+    console.log("🔍 Service: Buscando campeonato por ID:", id);
+
     const userId = this.getUserId();
     if (!userId) {
+      console.error("❌ Service: Usuário não autenticado ao buscar campeonato");
       throw new Error("Usuário não autenticado");
     }
 
     if (!(await this.isOnline())) {
+      console.log("📡 Service: Offline - não é possível buscar campeonato");
       throw new Error("Não é possível buscar campeonato - offline");
     }
 
     // Buscar diretamente do Firebase (sem cache)
     try {
+      console.log("🔍 Service: Fazendo consulta ao Firebase para ID:", id);
       const championshipRef = doc(db, "championships", id);
       const championshipDoc = await getDoc(championshipRef);
 
+      console.log("🔍 Service: Documento existe?", championshipDoc.exists());
+
       if (championshipDoc.exists()) {
         const championshipData = championshipDoc.data();
+        console.log("🔍 Service: Dados do campeonato:", {
+          hasUserId: !!championshipData.userId,
+          dataUserId: championshipData.userId,
+          currentUserId: userId,
+          userIdMatch: championshipData.userId === userId,
+        });
+
         if (championshipData.userId === userId) {
+          console.log(
+            "✅ Service: Campeonato encontrado e pertence ao usuário"
+          );
           return {
             id: championshipDoc.id,
             ...championshipData,
-            champion: typeof championshipData.champion === "string" ? championshipData.champion : (championshipData.champion?.name || ""),
+            champion:
+              typeof championshipData.champion === "string"
+                ? championshipData.champion
+                : championshipData.champion?.name || "",
           } as Championship;
+        } else {
+          console.log("❌ Service: Campeonato não pertence ao usuário atual");
         }
+      } else {
+        console.log("❌ Service: Documento não encontrado");
       }
       return null;
-    } catch (error) {
-      console.error("Erro ao buscar campeonato do Firebase:", error);
+    } catch (error: any) {
+      console.error("❌ Service: Erro ao buscar campeonato do Firebase:", {
+        error: error.message,
+        code: error.code,
+        championshipId: id,
+        userId: userId,
+      });
       return null;
     }
   }
@@ -476,7 +579,7 @@ export class ChampionshipService {
     }
 
     if (!(await this.isOnline())) {
-      console.error("❌ Service: Usuário offline");
+      // Mensagem já foi logada no método isOnline() se necessário
       throw new Error("Não é possível definir campeonato atual - offline");
     }
 
@@ -527,7 +630,7 @@ export class ChampionshipService {
     }
 
     if (!(await this.isOnline())) {
-      console.log("⚠️ Service: Usuário offline para getCurrentChampionship");
+      // Mensagem já foi logada no método isOnline() se necessário
       return null;
     }
 
@@ -1238,33 +1341,46 @@ export class ChampionshipService {
           });
         }
       }
-      
+
       // Embaralhar as combinações para sorteio aleatório
-      const shuffledMatchups = [...allPossibleMatchups].sort(() => Math.random() - 0.5);
+      const shuffledMatchups = [...allPossibleMatchups].sort(
+        () => Math.random() - 0.5
+      );
       console.log(`🎲 Combinações possíveis: ${shuffledMatchups.length}`);
-      
+
       // Selecionar apenas o número de jogos necessários
-      const selectedMatchups = shuffledMatchups.slice(0, Math.min(totalGames, shuffledMatchups.length));
+      const selectedMatchups = shuffledMatchups.slice(
+        0,
+        Math.min(totalGames, shuffledMatchups.length)
+      );
       console.log(`✅ Jogos selecionados: ${selectedMatchups.length}`);
-      
+
       // Distribuir os jogos pelas rodadas
-      const baseGamesPerRound = Math.floor(selectedMatchups.length / config.totalRounds);
+      const baseGamesPerRound = Math.floor(
+        selectedMatchups.length / config.totalRounds
+      );
       const extraGames = selectedMatchups.length % config.totalRounds;
-      
+
       let matchupIndex = 0;
-      
+
       for (let round = 1; round <= config.totalRounds; round++) {
-        const gamesInThisRound = baseGamesPerRound + (round <= extraGames ? 1 : 0);
+        const gamesInThisRound =
+          baseGamesPerRound + (round <= extraGames ? 1 : 0);
         console.log(`\n📅 Rodada ${round}: ${gamesInThisRound} jogos`);
-        
-        for (let game = 0; game < gamesInThisRound && matchupIndex < selectedMatchups.length; game++) {
+
+        for (
+          let game = 0;
+          game < gamesInThisRound && matchupIndex < selectedMatchups.length;
+          game++
+        ) {
           const matchup = selectedMatchups[matchupIndex];
-          
+
           // Sortear mando de campo
-          const [homeTeam, awayTeam] = Math.random() < 0.5 
-            ? [matchup.team1, matchup.team2] 
-            : [matchup.team2, matchup.team1];
-          
+          const [homeTeam, awayTeam] =
+            Math.random() < 0.5
+              ? [matchup.team1, matchup.team2]
+              : [matchup.team2, matchup.team1];
+
           matches.push({
             id: `game_${Date.now()}_${matchId++}`,
             homeTeam: homeTeam.id,
@@ -1275,54 +1391,62 @@ export class ChampionshipService {
             round: round,
             matchOrder: game + 1,
           });
-          
-          console.log(`  ⚽ Jogo ${game + 1}: ${homeTeam.name} vs ${awayTeam.name} (mando: ${homeTeam.name})`);
+
+          console.log(
+            `  ⚽ Jogo ${game + 1}: ${homeTeam.name} vs ${
+              awayTeam.name
+            } (mando: ${homeTeam.name})`
+          );
           matchupIndex++;
         }
       }
     } else {
       // MODO PADRÃO (sem configuração personalizada)
       console.log("🏆 Gerando jogos no modo padrão (todos contra todos)");
-      
+
       // Embaralhar times para sorteio da ordem dos confrontos
       const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
       console.log(
         "🎲 Ordem sorteada para confrontos:",
         shuffledTeams.map((t) => t.name)
       );
-      
+
       // Calcular número de rodadas necessárias
       const totalTeams = teams.length;
       const totalRounds = totalTeams - 1; // Número mínimo de rodadas para todos jogarem entre si
-      
+
       // Gerar jogos - todos contra todos (1 vez)
       console.log("\n🔄 === GERANDO JOGOS ===");
-      
+
       // Algoritmo para distribuir jogos em rodadas (Round Robin)
       // Baseado no algoritmo de Circle Method
       const teamsForAlgorithm = [...shuffledTeams];
       if (totalTeams % 2 === 1) {
         // Adicionar um time "fantasma" para parear
-        teamsForAlgorithm.push({ id: "bye", name: "Bye", color: "#000000", players: [] });
+        teamsForAlgorithm.push({
+          id: "bye",
+          name: "Bye",
+          color: "#000000",
+          players: [],
+        });
       }
-      
+
       const n = teamsForAlgorithm.length;
-      
+
       for (let round = 1; round <= totalRounds; round++) {
         console.log(`\n📅 Rodada ${round}:`);
         let gamesInRound = 0;
-        
+
         for (let i = 0; i < n / 2; i++) {
           const team1 = teamsForAlgorithm[i];
           const team2 = teamsForAlgorithm[n - 1 - i];
-          
+
           // Ignorar jogos com o time "fantasma"
           if (team1.id !== "bye" && team2.id !== "bye") {
             // Sortear mando de campo
-            const [homeTeam, awayTeam] = Math.random() < 0.5 
-              ? [team1, team2] 
-              : [team2, team1];
-            
+            const [homeTeam, awayTeam] =
+              Math.random() < 0.5 ? [team1, team2] : [team2, team1];
+
             matches.push({
               id: `game_${Date.now()}_${matchId++}`,
               homeTeam: homeTeam.id,
@@ -1333,20 +1457,24 @@ export class ChampionshipService {
               round: round,
               matchOrder: gamesInRound + 1,
             });
-            
-            console.log(`  ⚽ Jogo ${gamesInRound + 1}: ${homeTeam.name} vs ${awayTeam.name} (mando: ${homeTeam.name})`);
+
+            console.log(
+              `  ⚽ Jogo ${gamesInRound + 1}: ${homeTeam.name} vs ${
+                awayTeam.name
+              } (mando: ${homeTeam.name})`
+            );
             gamesInRound++;
           }
         }
-        
+
         // Rotacionar os times para a próxima rodada (mantendo o primeiro fixo)
         const firstTeam = teamsForAlgorithm[0];
         const lastTeam = teamsForAlgorithm[n - 1];
-        
+
         for (let i = n - 1; i > 1; i--) {
           teamsForAlgorithm[i] = teamsForAlgorithm[i - 1];
         }
-        
+
         teamsForAlgorithm[1] = lastTeam;
       }
     }
@@ -1899,11 +2027,11 @@ export class ChampionshipService {
       if (winners.length === 1) {
         const champion = championship.teams.find((t) => t.id === winners[0]);
         console.log(`👑 CAMPEÃO: ${champion?.name}`);
-        
+
         // Marcar o campeonato como finalizado
         championship.status = "finalizado";
         championship.champion = champion?.name || "";
-        
+
         console.log(`✅ Campeonato finalizado com sucesso!`);
         console.log(`🏆 Campeão oficial: ${champion?.name}`);
       } else {
