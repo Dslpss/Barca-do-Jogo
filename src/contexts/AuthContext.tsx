@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  Auth,
 } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
@@ -194,6 +195,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setError(null);
       setLoading(true);
+
+      // Verificar conectividade antes de tentar fazer login
+      const netInfo = await NetInfo.fetch();
+      if (!netInfo.isConnected) {
+        throw new Error(
+          "Sem conexão com a internet. Verifique sua conectividade."
+        );
+      }
+
       const result = await signInWithEmailAndPassword(auth, email, password);
 
       // Salvar credenciais para persistência

@@ -18,12 +18,26 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     // Atualiza o state para que a próxima renderização mostre a UI de erro
-    return { hasError: true, errorInfo: error.message };
+    let errorMessage = error.message;
+
+    // Tratar erros específicos do Firebase
+    if (error.message.includes("Firebase")) {
+      errorMessage =
+        "Erro de conectividade com o Firebase. Verifique sua conexão.";
+    } else if (error.message.includes("JniException")) {
+      errorMessage = "Erro de inicialização do app. Tente reiniciar.";
+    } else if (error.message.includes("auth/")) {
+      errorMessage = "Erro de autenticação. Tente fazer login novamente.";
+    }
+
+    return { hasError: true, errorInfo: errorMessage };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Você pode logar o erro aqui
+    // Log detalhado do erro
     console.error("ErrorBoundary capturou um erro:", error, errorInfo);
+    console.error("Stack trace:", error.stack);
+    console.error("Component stack:", errorInfo.componentStack);
   }
 
   handleRestart = () => {

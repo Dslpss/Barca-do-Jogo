@@ -50,8 +50,8 @@ class ConnectivityService {
         this.updateConnectivityState(false);
         return false;
       }
-      // Verificar conectividade real com Firebase usando uma coleção permitida
-      const testDoc = doc(db, "_health_check_", "ping");
+      // Verificar conectividade real com Firebase
+      const testDoc = doc(db, "connectivity", "test");
       try {
         await getDoc(testDoc);
         this.updateConnectivityState(true);
