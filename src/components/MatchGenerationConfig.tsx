@@ -9,11 +9,13 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
+import ManualDrawModal from "./ManualDrawModal";
 import { theme } from "../theme/theme";
 import {
   Team,
   ConfiguredMatchOptions,
   ManualMatch,
+  DrawOptions,
 } from "../types/championship";
 
 interface MatchGenerationConfigProps {
@@ -21,8 +23,9 @@ interface MatchGenerationConfigProps {
   onClose: () => void;
   teams: Team[];
   onGenerateMatches: (options: {
-    type: "configured";
-    configuredOptions: ConfiguredMatchOptions;
+    type: "configured" | "draw";
+    configuredOptions?: ConfiguredMatchOptions;
+    drawOptions?: DrawOptions;
     manualMatches: ManualMatch[];
   }) => void;
 }
@@ -44,6 +47,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
   );
   const [showPreview, setShowPreview] = useState(false);
   const [generatedMatches, setGeneratedMatches] = useState<ManualMatch[]>([]);
+  const [showDrawModal, setShowDrawModal] = useState(false);
 
   const maxPossibleMatches = teams.length > 1 ? teams.length - 1 : 0;
 
@@ -309,6 +313,16 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
     onClose();
   };
 
+  const handleDrawMatches = (options: {
+    type: "draw";
+    drawOptions: DrawOptions;
+    manualMatches: ManualMatch[];
+  }) => {
+    onGenerateMatches(options);
+    setShowDrawModal(false);
+    onClose();
+  };
+
   const getTeamName = (teamId: string) => {
     return teams.find((t) => t.id === teamId)?.name || "Time não encontrado";
   };
@@ -450,26 +464,35 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
             {/* Seção de Sugestões Inteligentes */}
             {teams.length >= 2 && (
               <View style={styles.smartSuggestionsContainer}>
-                <Text style={styles.smartSuggestionsTitle}>🧠 Sugestões Inteligentes</Text>
+                <Text style={styles.smartSuggestionsTitle}>
+                  🧠 Sugestões Inteligentes
+                </Text>
                 
                 {(() => {
                   const maxSimultaneousGames = Math.floor(teams.length / 2);
-                  const totalPossibleGames = (teams.length * (teams.length - 1)) / 2;
+                  const totalPossibleGames =
+                    (teams.length * (teams.length - 1)) / 2;
                   
                   // Sugestões baseadas no número de times
                   const suggestions = {
                     conservative: {
                       games: Math.ceil(teams.length * 0.6), // 60% dos times como adversários
-                      rounds: Math.ceil((teams.length * 0.6) / maxSimultaneousGames)
+                      rounds: Math.ceil(
+                        (teams.length * 0.6) / maxSimultaneousGames
+                      ),
                     },
                     balanced: {
                       games: Math.ceil(teams.length * 0.8), // 80% dos times como adversários
-                      rounds: Math.ceil((teams.length * 0.8) / maxSimultaneousGames)
+                      rounds: Math.ceil(
+                        (teams.length * 0.8) / maxSimultaneousGames
+                      ),
                     },
                     complete: {
                       games: totalPossibleGames, // Todos contra todos
-                      rounds: Math.ceil(totalPossibleGames / maxSimultaneousGames)
-                    }
+                      rounds: Math.ceil(
+                        totalPossibleGames / maxSimultaneousGames
+                      ),
+                    },
                   };
                   
                   return (
@@ -477,40 +500,72 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                       <TouchableOpacity 
                         style={styles.suggestionCard}
                         onPress={() => {
-                          setTotalGames(suggestions.conservative.games.toString());
-                          setTotalRounds(suggestions.conservative.rounds.toString());
+                          setTotalGames(
+                            suggestions.conservative.games.toString()
+                          );
+                          setTotalRounds(
+                            suggestions.conservative.rounds.toString()
+                          );
                         }}
                       >
-                        <Text style={styles.suggestionCardTitle}>🎯 Conservador</Text>
-                        <Text style={styles.suggestionCardText}>{suggestions.conservative.games} jogos</Text>
-                        <Text style={styles.suggestionCardText}>{suggestions.conservative.rounds} rodadas</Text>
-                        <Text style={styles.suggestionCardHint}>Campeonato rápido</Text>
+                        <Text style={styles.suggestionCardTitle}>
+                          🎯 Conservador
+                        </Text>
+                        <Text style={styles.suggestionCardText}>
+                          {suggestions.conservative.games} jogos
+                        </Text>
+                        <Text style={styles.suggestionCardText}>
+                          {suggestions.conservative.rounds} rodadas
+                        </Text>
+                        <Text style={styles.suggestionCardHint}>
+                          Campeonato rápido
+                        </Text>
                       </TouchableOpacity>
                       
                       <TouchableOpacity 
                         style={styles.suggestionCard}
                         onPress={() => {
                           setTotalGames(suggestions.balanced.games.toString());
-                          setTotalRounds(suggestions.balanced.rounds.toString());
+                          setTotalRounds(
+                            suggestions.balanced.rounds.toString()
+                          );
                         }}
                       >
-                        <Text style={styles.suggestionCardTitle}>⚖️ Equilibrado</Text>
-                        <Text style={styles.suggestionCardText}>{suggestions.balanced.games} jogos</Text>
-                        <Text style={styles.suggestionCardText}>{suggestions.balanced.rounds} rodadas</Text>
-                        <Text style={styles.suggestionCardHint}>Recomendado</Text>
+                        <Text style={styles.suggestionCardTitle}>
+                          ⚖️ Equilibrado
+                        </Text>
+                        <Text style={styles.suggestionCardText}>
+                          {suggestions.balanced.games} jogos
+                        </Text>
+                        <Text style={styles.suggestionCardText}>
+                          {suggestions.balanced.rounds} rodadas
+                        </Text>
+                        <Text style={styles.suggestionCardHint}>
+                          Recomendado
+                        </Text>
                       </TouchableOpacity>
                       
                       <TouchableOpacity 
                         style={styles.suggestionCard}
                         onPress={() => {
                           setTotalGames(suggestions.complete.games.toString());
-                          setTotalRounds(suggestions.complete.rounds.toString());
+                          setTotalRounds(
+                            suggestions.complete.rounds.toString()
+                          );
                         }}
                       >
-                        <Text style={styles.suggestionCardTitle}>🏆 Completo</Text>
-                        <Text style={styles.suggestionCardText}>{suggestions.complete.games} jogos</Text>
-                        <Text style={styles.suggestionCardText}>{suggestions.complete.rounds} rodadas</Text>
-                        <Text style={styles.suggestionCardHint}>Todos vs todos</Text>
+                        <Text style={styles.suggestionCardTitle}>
+                          🏆 Completo
+                        </Text>
+                        <Text style={styles.suggestionCardText}>
+                          {suggestions.complete.games} jogos
+                        </Text>
+                        <Text style={styles.suggestionCardText}>
+                          {suggestions.complete.rounds} rodadas
+                        </Text>
+                        <Text style={styles.suggestionCardHint}>
+                          Todos vs todos
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   );
@@ -563,22 +618,28 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
               <View style={styles.explanationContainer}>
                 {gameDistributionMode === "auto" ? (
                   <View style={styles.explanationBox}>
-                    <Text style={styles.explanationTitle}>🤖 Modo Automático</Text>
+                    <Text style={styles.explanationTitle}>
+                      🤖 Modo Automático
+                    </Text>
                     <Text style={styles.explanationText}>
-                      • Você define quantas partidas cada time deve jogar{"\n"}
-                      • O sistema distribui automaticamente os jogos entre as rodadas{"\n"}
-                      • Ideal quando você quer controlar a carga de jogos por time{"\n"}
-                      • Exemplo: Se cada time jogar 6 partidas, o sistema criará os confrontos necessários
+                      • Você define quantas partidas cada time deve jogar{"\n"}•
+                      O sistema distribui automaticamente os jogos entre as
+                      rodadas{"\n"}• Ideal quando você quer controlar a carga de
+                      jogos por time{"\n"}• Exemplo: Se cada time jogar 6
+                      partidas, o sistema criará os confrontos necessários
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.explanationBox}>
-                    <Text style={styles.explanationTitle}>⚙️ Modo Manual (Recomendado)</Text>
+                    <Text style={styles.explanationTitle}>
+                      ⚙️ Modo Manual (Recomendado)
+                    </Text>
                     <Text style={styles.explanationText}>
-                      • Você define o número total de jogos do campeonato{"\n"}
-                      • O sistema distribui equilibradamente entre todos os times{"\n"}
-                      • Garante que todos os times joguem aproximadamente a mesma quantidade{"\n"}
-                      • Exemplo: 15 jogos com 6 times = cada time joga cerca de 5 partidas
+                      • Você define o número total de jogos do campeonato{"\n"}•
+                      O sistema distribui equilibradamente entre todos os times
+                      {"\n"}• Garante que todos os times joguem aproximadamente
+                      a mesma quantidade{"\n"}• Exemplo: 15 jogos com 6 times =
+                      cada time joga cerca de 5 partidas
                     </Text>
                   </View>
                 )}
@@ -628,24 +689,29 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
               <View style={styles.explanationContainer}>
                 {generationMode === "dynamic" ? (
                   <View style={styles.explanationBox}>
-                    <Text style={styles.explanationTitle}>⚡ Geração Dinâmica</Text>
+                    <Text style={styles.explanationTitle}>
+                      ⚡ Geração Dinâmica
+                    </Text>
                     <Text style={styles.explanationText}>
-                      • Cria apenas a primeira rodada inicialmente{"\n"}
-                      • As próximas rodadas são geradas automaticamente conforme necessário{"\n"}
-                      • Permite ajustes e modificações durante o campeonato{"\n"}
-                      • Ideal para campeonatos longos ou com mudanças frequentes{"\n"}
-                      • Economiza espaço e permite maior flexibilidade
+                      • Cria apenas a primeira rodada inicialmente{"\n"}• As
+                      próximas rodadas são geradas automaticamente conforme
+                      necessário{"\n"}• Permite ajustes e modificações durante o
+                      campeonato{"\n"}• Ideal para campeonatos longos ou com
+                      mudanças frequentes{"\n"}• Economiza espaço e permite
+                      maior flexibilidade
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.explanationBox}>
-                    <Text style={styles.explanationTitle}>📋 Geração Completa</Text>
+                    <Text style={styles.explanationTitle}>
+                      📋 Geração Completa
+                    </Text>
                     <Text style={styles.explanationText}>
-                      • Gera todas as rodadas de uma só vez{"\n"}
-                      • Você pode visualizar todo o calendário antecipadamente{"\n"}
-                      • Ideal para campeonatos com cronograma fixo{"\n"}
-                      • Permite planejamento completo desde o início{"\n"}
-                      • Todas as partidas ficam visíveis imediatamente
+                      • Gera todas as rodadas de uma só vez{"\n"}• Você pode
+                      visualizar todo o calendário antecipadamente{"\n"}• Ideal
+                      para campeonatos com cronograma fixo{"\n"}• Permite
+                      planejamento completo desde o início{"\n"}• Todas as
+                      partidas ficam visíveis imediatamente
                     </Text>
                   </View>
                 )}
@@ -668,18 +734,25 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                   : "Quantas rodadas serão geradas agora"}
               </Text>
               {(() => {
-                const targetGamesNum = gameDistributionMode === "auto" 
-                  ? Math.floor((parseInt(matchesPerTeam || "0") * teams.length) / 2)
+                const targetGamesNum =
+                  gameDistributionMode === "auto"
+                    ? Math.floor(
+                        (parseInt(matchesPerTeam || "0") * teams.length) / 2
+                      )
                   : parseInt(totalGames || "0");
                 
                 if (targetGamesNum > 0) {
                   const maxSimultaneousGames = Math.floor(teams.length / 2);
-                  const suggestedRounds = Math.ceil(targetGamesNum / maxSimultaneousGames);
+                  const suggestedRounds = Math.ceil(
+                    targetGamesNum / maxSimultaneousGames
+                  );
                   
                   return (
                     <Text style={styles.suggestionHint}>
-                      💡 Sugestão: {suggestedRounds} rodada{suggestedRounds > 1 ? 's' : ''} 
-                      (baseado em {targetGamesNum} jogos e {maxSimultaneousGames} jogos simultâneos por rodada)
+                      💡 Sugestão: {suggestedRounds} rodada
+                      {suggestedRounds > 1 ? "s" : ""}
+                      (baseado em {targetGamesNum} jogos e{" "}
+                      {maxSimultaneousGames} jogos simultâneos por rodada)
                     </Text>
                   );
                 }
@@ -716,7 +789,8 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                   maxLength={3}
                 />
                 <Text style={styles.hint}>
-                  Número total de jogos que serão realizados no campeonato (sem turno e returno)
+                  Número total de jogos que serão realizados no campeonato (sem
+                  turno e returno)
                 </Text>
                 {totalGames && parseInt(totalGames) > 0 && (
                   <Text style={styles.calculationHint}>
@@ -736,6 +810,12 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                 <Text style={styles.secondaryButtonText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={[styles.button, styles.drawButton]}
+                onPress={() => setShowDrawModal(true)}
+              >
+                <Text style={styles.drawButtonText}>🎲 Sortear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.button, styles.primaryButton]}
                 onPress={handlePreviewMatches}
               >
@@ -745,6 +825,13 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
           </ScrollView>
         </View>
       </View>
+
+      <ManualDrawModal
+        visible={showDrawModal}
+        onClose={() => setShowDrawModal(false)}
+        teams={teams}
+        onGenerateMatches={handleDrawMatches}
+      />
     </Modal>
   );
 };
@@ -854,6 +941,9 @@ const styles = StyleSheet.create({
   secondaryButton: {
     backgroundColor: theme.colors.border,
   },
+  drawButton: {
+    backgroundColor: "#FF6B35",
+  },
   primaryButtonText: {
     color: "white",
     fontSize: 16,
@@ -862,6 +952,11 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: theme.colors.text,
     fontSize: 16,
+  },
+  drawButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   previewContainer: {
     flex: 1,

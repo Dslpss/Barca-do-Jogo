@@ -13,6 +13,7 @@ import {
 import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import MatchGenerationConfig from "../components/MatchGenerationConfig";
+import ManualDrawModal from "../components/ManualDrawModal";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
 import { ChampionshipService } from "../services/championshipService";
@@ -63,6 +64,14 @@ const ChampionshipMatchesScreen = () => {
     useState(false);
   const [showConfiguredGenerationModal, setShowConfiguredGenerationModal] =
     useState(false);
+  const [showDrawModal, setShowDrawModal] = useState(false);
+  const [showQuickManualModal, setShowQuickManualModal] = useState(false);
+  const [showTeamSelector, setShowTeamSelector] = useState<
+    "home" | "away" | null
+  >(null);
+  const [selectedHomeTeam, setSelectedHomeTeam] = useState<string>("");
+  const [selectedAwayTeam, setSelectedAwayTeam] = useState<string>("");
+  const [matchesAddedCount, setMatchesAddedCount] = useState(0);
   const [selectedManualMatches, setSelectedManualMatches] = useState<
     ManualMatch[]
   >([]);
@@ -362,8 +371,9 @@ const ChampionshipMatchesScreen = () => {
   };
 
   const handleConfiguredGeneration = async (options: {
-    type: "configured";
-    configuredOptions: ConfiguredMatchOptions;
+    type: "configured" | "draw";
+    configuredOptions?: ConfiguredMatchOptions;
+    drawOptions?: any;
     manualMatches: ManualMatch[];
   }) => {
     if (!currentChampionship) return;
@@ -385,6 +395,153 @@ const ChampionshipMatchesScreen = () => {
       console.error("Erro ao gerar partidas configuradas:", error);
       Alert.alert("Erro", "Erro ao gerar partidas. Tente novamente.");
     }
+  };
+
+  const handleDrawGeneration = async (options: {
+    type: "draw";
+    drawOptions: any;
+    manualMatches: ManualMatch[];
+  }) => {
+    if (!currentChampionship) return;
+
+    try {
+      const generationOptions: MatchGenerationOptions = {
+        type: "draw",
+        manualMatches: options.manualMatches,
+        drawOptions: options.drawOptions,
+      };
+
+      await generateMatches(generationOptions);
+      setShowDrawModal(false);
+      Alert.alert(
+        "Sucesso",
+        `🎲 ${options.manualMatches.length} partidas sorteadas com sucesso!`
+      );
+    } catch (error) {
+      console.error("Erro ao sortear partidas:", error);
+      Alert.alert("Erro", "Erro ao sortear partidas. Tente novamente.");
+    }
+  };
+
+  const handleQuickManualMatch = () => {
+    console.log(
+      "🔍 Debug - Times disponíveis:",
+      currentChampionship?.teams?.length || 0
+    );
+    console.log("🔍 Debug - Times:", currentChampionship?.teams);
+
+    if (!currentChampionship?.teams || currentChampionship.teams.length < 2) {
+      Alert.alert(
+        "Erro",
+        "É necessário pelo menos 2 times para criar partidas"
+      );
+      return;
+    }
+    setShowQuickManualModal(true);
+  };
+
+  const handleAddQuickMatch = (homeTeamId: string, awayTeamId: string) => {
+    if (homeTeamId === awayTeamId) {
+      Alert.alert("Erro", "Um time não pode jogar contra ele mesmo");
+      return;
+    }
+
+    // Verificar se o confronto já existe
+    const existingMatches = currentChampionship?.matches || [];
+    const matchExists = existingMatches.some(
+      (match) =>
+        (match.homeTeam === homeTeamId && match.awayTeam === awayTeamId) ||
+        (match.homeTeam === awayTeamId && match.awayTeam === homeTeamId)
+    );
+
+    if (matchExists) {
+      Alert.alert("Erro", "Este confronto já existe");
+      return;
+    }
+
+    // Criar a partida manual
+    const newMatch: ManualMatch = {
+      homeTeamId,
+      awayTeamId,
+      round: 1,
+    };
+
+    // Gerar a partida imediatamente
+    generateMatches({
+      type: "manual",
+      manualMatches: [newMatch],
+    })
+      .then(() => {
+        // Incrementar contador de partidas adicionadas
+        setMatchesAddedCount((prev) => prev + 1);
+
+        // Limpar seleção mas manter modal aberto
+        setSelectedHomeTeam("");
+        setSelectedAwayTeam("");
+
+        Alert.alert(
+          "Partida Adicionada!",
+          `Partida criada com sucesso!\n\nTotal adicionadas: ${
+            matchesAddedCount + 1
+          }\n\nDeseja adicionar outra partida?`,
+          [
+            {
+              text: "Adicionar Outra",
+              onPress: () => {
+                // Modal permanece aberto para adicionar mais partidas
+              },
+            },
+            {
+              text: "Finalizar",
+              onPress: () => {
+                setShowQuickManualModal(false);
+                setMatchesAddedCount(0); // Resetar contador
+              },
+            },
+          ]
+        );
+      })
+      .catch((error: any) => {
+        Alert.alert("Erro", error.message || "Erro ao adicionar partida");
+      });
+  };
+
+  const handleTeamSelect = (teamId: string) => {
+    console.log("🔍 Debug - handleTeamSelect - teamId:", teamId);
+    console.log(
+      "🔍 Debug - handleTeamSelect - showTeamSelector:",
+      showTeamSelector
+    );
+
+    if (showTeamSelector === "home") {
+      console.log("🔍 Debug - Definindo time da casa:", teamId);
+      setSelectedHomeTeam(teamId);
+    } else if (showTeamSelector === "away") {
+      console.log("🔍 Debug - Definindo time visitante:", teamId);
+      setSelectedAwayTeam(teamId);
+    }
+    setShowTeamSelector(null);
+  };
+
+  const getAvailableTeams = () => {
+    const teams = currentChampionship?.teams || [];
+    console.log("🔍 Debug - getAvailableTeams - Times base:", teams.length);
+    console.log("🔍 Debug - showTeamSelector:", showTeamSelector);
+    console.log("🔍 Debug - selectedHomeTeam:", selectedHomeTeam);
+    console.log("🔍 Debug - selectedAwayTeam:", selectedAwayTeam);
+
+    if (showTeamSelector === "home") {
+      const filtered = teams.filter((team) => team.id !== selectedAwayTeam);
+      console.log("🔍 Debug - Times filtrados (home):", filtered.length);
+      return filtered;
+    } else if (showTeamSelector === "away") {
+      const filtered = teams.filter((team) => team.id !== selectedHomeTeam);
+      console.log("🔍 Debug - Times filtrados (away):", filtered.length);
+      return filtered;
+    }
+
+    console.log("🔍 Debug - Retornando todos os times:", teams.length);
+    return teams;
   };
 
   const handleAddManualMatch = (homeTeamId: string, awayTeamId: string) => {
@@ -1246,12 +1403,26 @@ const ChampionshipMatchesScreen = () => {
             <Text style={styles.emptySubtext}>
               Gere as partidas para começar o campeonato
             </Text>
-            <TouchableOpacity
-              style={styles.generateButton}
-              onPress={handleGenerateMatches}
-            >
-              <Text style={styles.generateButtonText}>Gerar Partidas</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.generateButton, styles.buttonThird]}
+                onPress={handleGenerateMatches}
+              >
+                <Text style={styles.generateButtonText}>Gerar Partidas</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.drawButton, styles.buttonThird]}
+                onPress={() => setShowDrawModal(true)}
+              >
+                <Text style={styles.drawButtonText}>🎲 Sortear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.manualButton, styles.buttonThird]}
+                onPress={handleQuickManualMatch}
+              >
+                <Text style={styles.manualButtonText}>⚽ Manual</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
           <>
@@ -1320,6 +1491,61 @@ const ChampionshipMatchesScreen = () => {
         onGenerateMatches={handleConfiguredGeneration}
         onClose={() => setShowConfiguredGenerationModal(false)}
       />
+
+      {/* Modal de Sorteio Manual */}
+      <ManualDrawModal
+        visible={showDrawModal}
+        teams={currentChampionship?.teams || []}
+        onGenerateMatches={handleDrawGeneration}
+        onClose={() => setShowDrawModal(false)}
+      />
+
+      {/* Modal de Seleção Manual Rápida */}
+      <QuickManualMatchModal
+        visible={showQuickManualModal}
+        teams={currentChampionship?.teams || []}
+        onAddMatch={handleAddQuickMatch}
+        onClose={() => {
+          setShowQuickManualModal(false);
+          setMatchesAddedCount(0);
+          setSelectedHomeTeam("");
+          setSelectedAwayTeam("");
+        }}
+        selectedHomeTeam={selectedHomeTeam}
+        selectedAwayTeam={selectedAwayTeam}
+        matchesAddedCount={matchesAddedCount}
+        onSelectHomeTeam={() => {
+          console.log("🔍 Debug - Clicou em selecionar time da casa");
+          console.log(
+            "🔍 Debug - Times disponíveis:",
+            currentChampionship?.teams?.length
+          );
+          setShowTeamSelector("home");
+        }}
+        onSelectAwayTeam={() => {
+          console.log("🔍 Debug - Clicou em selecionar time visitante");
+          console.log(
+            "🔍 Debug - Times disponíveis:",
+            currentChampionship?.teams?.length
+          );
+          setShowTeamSelector("away");
+        }}
+      />
+
+      {/* Modal de Seleção de Times */}
+      {showTeamSelector && (
+        <TeamSelectorModal
+          visible={true}
+          teams={getAvailableTeams()}
+          onSelect={handleTeamSelect}
+          onClose={() => setShowTeamSelector(null)}
+          title={
+            showTeamSelector === "home"
+              ? "Selecionar Time da Casa"
+              : "Selecionar Time Visitante"
+          }
+        />
+      )}
     </View>
   );
 };
@@ -1877,6 +2103,40 @@ const styles = StyleSheet.create({
   generateButtonText: {
     ...theme.typography.button,
     color: theme.colors.white,
+    fontSize: 12,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: theme.spacing.sm,
+  },
+  buttonHalf: {
+    flex: 1,
+  },
+  buttonThird: {
+    flex: 1,
+  },
+  drawButton: {
+    backgroundColor: "#FF6B35",
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.spacing.sm,
+  },
+  drawButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontSize: 12,
+  },
+  manualButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.spacing.sm,
+  },
+  manualButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontSize: 12,
   },
   header: {
     flexDirection: "row",
@@ -2423,6 +2683,507 @@ const modalStyles = StyleSheet.create({
     color: theme.colors.white,
     fontWeight: "600",
   },
+  subtitle: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    marginBottom: theme.spacing.lg,
+  },
+  teamBadge: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.spacing.sm,
+    alignItems: "center",
+    minWidth: 120,
+  },
+  teamBadgeText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontWeight: "600",
+  },
+  actions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.spacing.sm,
+    alignItems: "center",
+  },
+  confirmButton: {
+    backgroundColor: theme.colors.primary,
+  },
+  confirmButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+  },
+  disabledButton: {
+    backgroundColor: theme.colors.textSecondary,
+    opacity: 0.6,
+  },
+  scrollContainer: {
+    flex: 1,
+    maxHeight: 300,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.md,
+  },
+  teamOption: {
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    alignItems: "center",
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  teamOptionText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontWeight: "600",
+  },
 });
+
+// Componente Modal para Seleção Manual Rápida
+const QuickManualMatchModal = ({
+  visible,
+  teams,
+  onAddMatch,
+  onClose,
+  selectedHomeTeam,
+  selectedAwayTeam,
+  onSelectHomeTeam,
+  onSelectAwayTeam,
+  matchesAddedCount,
+}: {
+  visible: boolean;
+  teams: Team[];
+  onAddMatch: (homeTeamId: string, awayTeamId: string) => void;
+  onClose: () => void;
+  selectedHomeTeam: string;
+  selectedAwayTeam: string;
+  onSelectHomeTeam: () => void;
+  onSelectAwayTeam: () => void;
+  matchesAddedCount: number;
+}) => {
+  console.log("🔍 Debug - QuickManualMatchModal renderizando");
+  console.log("🔍 Debug - selectedHomeTeam:", selectedHomeTeam);
+  console.log("🔍 Debug - selectedAwayTeam:", selectedAwayTeam);
+  console.log("🔍 Debug - teams.length:", teams.length);
+
+  const handleConfirm = () => {
+    if (!selectedHomeTeam || !selectedAwayTeam) {
+      Alert.alert("Erro", "Selecione ambos os times");
+      return;
+    }
+    onAddMatch(selectedHomeTeam, selectedAwayTeam);
+  };
+
+  const getTeamName = (teamId: string) => {
+    return teams.find((t) => t.id === teamId)?.name || "Selecionar time";
+  };
+
+  const getTeamColor = (teamId: string) => {
+    return teams.find((t) => t.id === teamId)?.color || "#cccccc";
+  };
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: "white",
+            borderRadius: 15,
+            width: "100%",
+            maxHeight: "80%",
+            padding: 20,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: "bold",
+              textAlign: "center",
+              marginBottom: 10,
+              color: "#333",
+            }}
+          >
+            ⚽ Seleção Manual de Partida
+          </Text>
+
+          {matchesAddedCount > 0 && (
+            <Text
+              style={{
+                fontSize: 14,
+                textAlign: "center",
+                marginBottom: 10,
+                color: "#007AFF",
+                fontWeight: "bold",
+              }}
+            >
+              📊 {matchesAddedCount} partida(s) adicionada(s)
+            </Text>
+          )}
+
+          <Text
+            style={{
+              fontSize: 14,
+              textAlign: "center",
+              marginBottom: 20,
+              color: "#666",
+            }}
+          >
+            Escolha os times que vão se enfrentar:
+          </Text>
+
+          {/* Seleção do Time da Casa */}
+          <View style={{ marginBottom: 20 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "bold",
+                marginBottom: 10,
+                color: "#333",
+              }}
+            >
+              Time da Casa:
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: selectedHomeTeam
+                  ? getTeamColor(selectedHomeTeam)
+                  : "#f0f0f0",
+                padding: 15,
+                borderRadius: 10,
+                alignItems: "center",
+                borderWidth: 2,
+                borderColor: selectedHomeTeam
+                  ? getTeamColor(selectedHomeTeam)
+                  : "#ddd",
+              }}
+              onPress={() => {
+                console.log("🔍 Debug - BOTÃO TIME DA CASA CLICADO!");
+                onSelectHomeTeam();
+              }}
+            >
+              <Text
+                style={{
+                  color: selectedHomeTeam ? "white" : "#666",
+                  fontSize: 16,
+                  fontWeight: "bold",
+                }}
+              >
+                {getTeamName(selectedHomeTeam)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* VS */}
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "bold",
+              textAlign: "center",
+              marginVertical: 10,
+              color: "#333",
+            }}
+          >
+            VS
+          </Text>
+
+          {/* Seleção do Time Visitante */}
+          <View style={{ marginBottom: 20 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "bold",
+                marginBottom: 10,
+                color: "#333",
+              }}
+            >
+              Time Visitante:
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: selectedAwayTeam
+                  ? getTeamColor(selectedAwayTeam)
+                  : "#f0f0f0",
+                padding: 15,
+                borderRadius: 10,
+                alignItems: "center",
+                borderWidth: 2,
+                borderColor: selectedAwayTeam
+                  ? getTeamColor(selectedAwayTeam)
+                  : "#ddd",
+              }}
+              onPress={() => {
+                console.log("🔍 Debug - BOTÃO TIME VISITANTE CLICADO!");
+                onSelectAwayTeam();
+              }}
+            >
+              <Text
+                style={{
+                  color: selectedAwayTeam ? "white" : "#666",
+                  fontSize: 16,
+                  fontWeight: "bold",
+                }}
+              >
+                {getTeamName(selectedAwayTeam)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Botões */}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: "#ccc",
+                padding: 15,
+                borderRadius: 10,
+                alignItems: "center",
+              }}
+              onPress={onClose}
+            >
+              <Text
+                style={{
+                  color: "#333",
+                  fontSize: 16,
+                  fontWeight: "bold",
+                }}
+              >
+                Finalizar
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor:
+                  !selectedHomeTeam || !selectedAwayTeam ? "#ccc" : "#007AFF",
+                padding: 15,
+                borderRadius: 10,
+                alignItems: "center",
+              }}
+              onPress={handleConfirm}
+              disabled={!selectedHomeTeam || !selectedAwayTeam}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 16,
+                  fontWeight: "bold",
+                }}
+              >
+                Adicionar Partida
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// Modal de Seleção de Times (separado)
+const TeamSelectorModal = ({
+  visible,
+  teams,
+  onSelect,
+  onClose,
+  title,
+}: {
+  visible: boolean;
+  teams: Team[];
+  onSelect: (teamId: string) => void;
+  onClose: () => void;
+  title: string;
+}) => {
+  console.log("🔍 Debug - TeamSelectorModal - visible:", visible);
+  console.log("🔍 Debug - TeamSelectorModal - teams:", teams.length);
+  console.log("🔍 Debug - TeamSelectorModal - title:", title);
+
+  if (!visible) {
+    console.log("🔍 Debug - TeamSelectorModal não está visível");
+    return null;
+  }
+
+  const [searchText, setSearchText] = useState("");
+
+  // Filtrar times baseado na busca
+  const filteredTeams = teams.filter((team) =>
+    team.name.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  console.log(
+    "🔍 Debug - TeamSelectorModal RENDERIZANDO com",
+    teams.length,
+    "times"
+  );
+  console.log("🔍 Debug - Times filtrados:", filteredTeams.length);
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: "white",
+            borderRadius: 15,
+            width: "100%",
+            maxHeight: "80%",
+            padding: 20,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: "bold",
+              textAlign: "center",
+              marginBottom: 10,
+              color: "#333",
+            }}
+          >
+            {title}
+          </Text>
+
+          <Text
+            style={{
+              fontSize: 14,
+              textAlign: "center",
+              marginBottom: 15,
+              color: "#666",
+            }}
+          >
+            {teams.length} times disponíveis
+          </Text>
+
+          {/* Campo de busca - só aparece se houver mais de 5 times */}
+          {teams.length > 5 && (
+            <View style={{ marginBottom: 15 }}>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: "#ddd",
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: "#f9f9f9",
+                }}
+                placeholder="🔍 Buscar time..."
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholderTextColor="#999"
+              />
+            </View>
+          )}
+
+          <ScrollView
+            style={{ maxHeight: 400 }}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          >
+            {filteredTeams.length === 0 ? (
+              <Text
+                style={{
+                  textAlign: "center",
+                  color: "#666",
+                  fontSize: 14,
+                  padding: 20,
+                }}
+              >
+                {searchText
+                  ? "Nenhum time encontrado"
+                  : "Nenhum time disponível"}
+              </Text>
+            ) : (
+              filteredTeams.map((team, index) => {
+                console.log(
+                  `🔍 Debug - Renderizando time ${index + 1}:`,
+                  team.name
+                );
+                return (
+                  <TouchableOpacity
+                    key={team.id}
+                    style={{
+                      backgroundColor: team.color,
+                      padding: 12,
+                      marginBottom: 8,
+                      borderRadius: 8,
+                      alignItems: "center",
+                      minHeight: 45,
+                      justifyContent: "center",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 2,
+                      elevation: 2,
+                    }}
+                    onPress={() => {
+                      console.log("🔍 Debug - Clicou no time:", team.name);
+                      onSelect(team.id);
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 15,
+                        fontWeight: "bold",
+                        textAlign: "center",
+                      }}
+                    >
+                      {team.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: "#ccc",
+              padding: 15,
+              borderRadius: 10,
+              alignItems: "center",
+              marginTop: 20,
+            }}
+            onPress={onClose}
+          >
+            <Text
+              style={{
+                color: "#333",
+                fontSize: 16,
+                fontWeight: "bold",
+              }}
+            >
+              Cancelar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 export default ChampionshipMatchesScreen;

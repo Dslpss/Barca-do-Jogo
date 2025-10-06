@@ -49,9 +49,10 @@ export interface Match {
 }
 
 export interface MatchGenerationOptions {
-  type: "manual" | "configured";
+  type: "manual" | "configured" | "draw";
   manualMatches?: ManualMatch[]; // Confrontos selecionados manualmente (opcional)
   configuredOptions?: ConfiguredMatchOptions; // Configurações de geração (opcional)
+  drawOptions?: DrawOptions; // Opções de sorteio manual (opcional)
 }
 
 export interface ConfiguredMatchOptions {
@@ -67,6 +68,15 @@ export interface ManualMatch {
   homeTeamId: string;
   awayTeamId: string;
   round?: number;
+}
+
+export interface DrawOptions {
+  totalRounds: number; // Número total de rodadas
+  totalMatches: number; // Número total de jogos a sortear
+  drawMode: "random" | "balanced" | "seeded"; // Modo de sorteio
+  allowSameTeamTwice: boolean; // Se permite o mesmo time jogar duas vezes na mesma rodada
+  shuffleTeams: boolean; // Se deve embaralhar a ordem dos times
+  groupBySkill: boolean; // Se deve agrupar times por nível de habilidade
 }
 
 export interface Championship {

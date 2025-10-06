@@ -893,6 +893,10 @@ export class ChampionshipService {
       // Geração configurada (com rodadas e partidas por time)
       console.log("⚙️ Gerando partidas com configurações personalizadas...");
       newMatches = this.generateManualMatches(options.manualMatches, teams);
+    } else if (options?.type === "draw" && options.manualMatches) {
+      // Geração por sorteio manual
+      console.log("🎲 Gerando partidas por sorteio manual...");
+      newMatches = this.generateManualMatches(options.manualMatches, teams);
     } else if (championship.type === "pontos_corridos") {
       // Geração automática para pontos corridos (todos contra todos)
       console.log("🔄 Gerando partidas para pontos corridos...");
