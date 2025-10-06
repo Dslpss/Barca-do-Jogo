@@ -219,9 +219,6 @@ const ChampionshipMatchesScreen = () => {
                     console.log("🔄 Gerando próxima fase do mata-mata...");
 
                     // USAR O MÉTODO ESTÁTICO DA CLASSE IMPORTADA
-                    const { ChampionshipService } = await import(
-                      "../services/championshipService"
-                    );
                     await ChampionshipService.checkAndGenerateNextKnockoutRound(
                       currentChampionship.id
                     );
