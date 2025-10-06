@@ -18,6 +18,9 @@
       },
       "ios": {
         "simulator": true
+      },
+      "cache": {
+        "disabled": true
       }
     },
     "production": {
