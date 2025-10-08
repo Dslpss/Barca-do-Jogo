@@ -11,6 +11,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
@@ -209,6 +210,9 @@ const ChampionshipPlayersScreen = () => {
     <View style={styles.teamSection}>
       <View style={styles.teamSectionHeader}>
         <View style={styles.teamTitleContainer}>
+          {team.logo && (
+            <Image source={{ uri: team.logo }} style={styles.teamLogo} />
+          )}
           <Text style={styles.teamSectionTitle}>{team.name}</Text>
           {team.color && (
             <View
@@ -383,7 +387,15 @@ const ChampionshipPlayersScreen = () => {
 
               {renderStars(playerSkill, setPlayerSkill)}
 
-              <View style={[styles.modalButtons, { marginHorizontal: theme.spacing.md, paddingTop: theme.spacing.md }]}>
+              <View
+                style={[
+                  styles.modalButtons,
+                  {
+                    marginHorizontal: theme.spacing.md,
+                    paddingTop: theme.spacing.md,
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton]}
                   onPress={() => {
@@ -500,6 +512,14 @@ const styles = StyleSheet.create({
   teamTitleContainer: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  teamLogo: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   teamSectionTitle: {
     ...theme.typography.h3,

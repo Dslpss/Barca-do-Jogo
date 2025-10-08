@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  Image,
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,7 +25,7 @@ const ChampionshipAllPlayersScreen = () => {
     "all" | "name" | "cpf" | "team"
   >("all");
   const [filteredPlayers, setFilteredPlayers] = useState<
-    Array<Player & { teamName: string; teamColor: string }>
+    Array<Player & { teamName: string; teamColor: string; teamLogo?: string }>
   >([]);
 
   useEffect(() => {
@@ -42,8 +43,9 @@ const ChampionshipAllPlayersScreen = () => {
   const getAllPlayersWithTeam = () => {
     if (!currentChampionship) return [];
 
-    const allPlayers: Array<Player & { teamName: string; teamColor: string }> =
-      [];
+    const allPlayers: Array<
+      Player & { teamName: string; teamColor: string; teamLogo?: string }
+    > = [];
 
     currentChampionship.teams.forEach((team) => {
       team.players.forEach((player) => {
@@ -51,6 +53,7 @@ const ChampionshipAllPlayersScreen = () => {
           ...player,
           teamName: team.name,
           teamColor: team.color,
+          teamLogo: team.logo,
         });
       });
     });
@@ -141,7 +144,7 @@ const ChampionshipAllPlayersScreen = () => {
   );
 
   const renderPlayerCard = (
-    player: Player & { teamName: string; teamColor: string }
+    player: Player & { teamName: string; teamColor: string; teamLogo?: string }
   ) => (
     <View key={player.id} style={styles.playerCard}>
       <View style={styles.playerHeader}>
@@ -150,6 +153,9 @@ const ChampionshipAllPlayersScreen = () => {
           <Text style={styles.playerPosition}>{player.position}</Text>
         </View>
         <View style={[styles.teamBadge, { backgroundColor: player.teamColor }]}>
+          {player.teamLogo && (
+            <Image source={{ uri: player.teamLogo }} style={styles.teamLogo} />
+          )}
           <Text style={styles.teamBadgeText}>{player.teamName}</Text>
         </View>
       </View>
@@ -419,6 +425,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.spacing.sm,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  teamLogo: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: "white",
   },
   teamBadgeText: {
     ...theme.typography.caption,

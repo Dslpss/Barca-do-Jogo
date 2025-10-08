@@ -17,6 +17,7 @@ export interface Team {
   players: Player[];
   eliminated?: boolean; // Para campeonatos mata-mata
   eliminatedInRound?: number; // Em qual rodada foi eliminado
+  logo?: string; // URI da imagem do brasão/logo do time
 }
 
 export interface Group {

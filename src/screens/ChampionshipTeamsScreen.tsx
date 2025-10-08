@@ -9,12 +9,16 @@ import {
   TextInput,
   Modal,
   FlatList,
+  Image,
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
 import { Team } from "../types/championship";
+import { ChampionshipService } from "../services/championshipService";
 
 // Cores disponíveis para os times
 const COLETE_CORES: { [key: string]: string } = {
@@ -36,17 +40,71 @@ const ChampionshipTeamsScreen = () => {
     useChampionship();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [teamName, setTeamName] = useState("");
   const [selectedColor, setSelectedColor] = useState(
     Object.keys(COLETE_CORES)[0]
   );
   const [noColor, setNoColor] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isFocused) {
       loadCurrentChampionship();
     }
   }, [isFocused]);
+
+  // Função para selecionar imagem do brasão
+  const selectTeamImage = async () => {
+    try {
+      // Solicitar permissão para acessar a galeria
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permissão necessária",
+          "Precisamos de permissão para acessar suas fotos para selecionar o brasão do time."
+        );
+        return;
+      }
+
+      // Abrir a galeria de imagens
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1], // Aspecto quadrado para brasões
+        quality: 0.3, // Reduzir mais a qualidade para otimizar o banco
+        base64: true, // Converter para Base64
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const base64Image = result.assets[0].base64;
+
+        if (base64Image) {
+          // Verificar tamanho da imagem (Base64 deve ser menor que 1MB para Firestore)
+          const sizeInBytes = (base64Image.length * 3) / 4;
+          const sizeInMB = sizeInBytes / (1024 * 1024);
+
+          if (sizeInMB > 1) {
+            Alert.alert(
+              "Imagem muito grande",
+              "Por favor, selecione uma imagem menor. A imagem deve ter menos de 1MB."
+            );
+            return;
+          }
+
+          // Criar URI com prefixo data para exibição
+          const imageUri = `data:image/jpeg;base64,${base64Image}`;
+          setSelectedImage(imageUri);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao selecionar imagem:", error);
+      Alert.alert("Erro", "Não foi possível selecionar a imagem");
+    }
+  };
 
   const handleAddTeam = async () => {
     if (!teamName.trim()) {
@@ -64,16 +122,79 @@ const ChampionshipTeamsScreen = () => {
         name: teamName.trim(),
         color: noColor ? "" : selectedColor,
         players: [],
+        ...(selectedImage && { logo: selectedImage }),
       };
 
       await addTeam(newTeam);
       setTeamName("");
       setSelectedColor(Object.keys(COLETE_CORES)[0]);
       setNoColor(false);
+      setSelectedImage(null);
       setShowAddModal(false);
       Alert.alert("Sucesso", "Time adicionado com sucesso!");
     } catch (error) {
       Alert.alert("Erro", "Erro ao adicionar time");
+    }
+  };
+
+  const handleEditTeam = (team: Team) => {
+    setEditingTeam(team);
+    setTeamName(team.name);
+    setSelectedColor(team.color || Object.keys(COLETE_CORES)[0]);
+    setNoColor(!team.color);
+    setSelectedImage(team.logo || null);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateTeam = async () => {
+    if (!teamName.trim()) {
+      Alert.alert("Erro", "Digite um nome para o time");
+      return;
+    }
+
+    if (!editingTeam || !currentChampionship) {
+      Alert.alert("Erro", "Erro interno");
+      return;
+    }
+
+    try {
+      const updatedTeam: Team = {
+        ...editingTeam,
+        name: teamName.trim(),
+        color: noColor ? "" : selectedColor,
+        ...(selectedImage && { logo: selectedImage }),
+      };
+
+      // Se não há imagem selecionada, remover a propriedade logo
+      if (!selectedImage && updatedTeam.logo) {
+        delete updatedTeam.logo;
+      }
+
+      // Atualizar o time no campeonato
+      const updatedChampionship = {
+        ...currentChampionship,
+        teams: currentChampionship.teams.map((t) =>
+          t.id === editingTeam.id ? updatedTeam : t
+        ),
+      };
+
+      // Salvar no serviço
+      await ChampionshipService.updateChampionship(updatedChampionship);
+
+      // Limpar estados
+      setEditingTeam(null);
+      setTeamName("");
+      setSelectedColor(Object.keys(COLETE_CORES)[0]);
+      setNoColor(false);
+      setSelectedImage(null);
+      setShowEditModal(false);
+
+      // Recarregar dados
+      await loadCurrentChampionship();
+
+      Alert.alert("Sucesso", "Time atualizado com sucesso!");
+    } catch (error) {
+      Alert.alert("Erro", "Erro ao atualizar time");
     }
   };
 
@@ -103,24 +224,47 @@ const ChampionshipTeamsScreen = () => {
     <View style={styles.teamCard}>
       <View style={styles.teamHeader}>
         <View style={styles.teamInfo}>
-          <Text style={styles.teamName}>{item.name}</Text>
-          {item.color && (
-            <View style={styles.colorInfo}>
-              <View
-                style={[styles.colorPreview, { backgroundColor: item.color }]}
-              />
-              <Text style={styles.colorName}>
-                {COLETE_CORES[item.color] || "Cor personalizada"}
-              </Text>
+          <View style={styles.teamTitleRow}>
+            {/* Brasão do time */}
+            {item.logo ? (
+              <Image source={{ uri: item.logo }} style={styles.teamLogo} />
+            ) : (
+              <View style={styles.teamLogoPlaceholder}>
+                <Text style={styles.teamLogoPlaceholderText}>⚽</Text>
+              </View>
+            )}
+            <View style={styles.teamDetails}>
+              <Text style={styles.teamName}>{item.name}</Text>
+              {item.color && (
+                <View style={styles.colorInfo}>
+                  <View
+                    style={[
+                      styles.colorPreview,
+                      { backgroundColor: item.color },
+                    ]}
+                  />
+                  <Text style={styles.colorName}>
+                    {COLETE_CORES[item.color] || "Cor personalizada"}
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
+          </View>
         </View>
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => handleRemoveTeam(item)}
-        >
-          <Text style={styles.removeButtonText}>🗑️</Text>
-        </TouchableOpacity>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => handleEditTeam(item)}
+          >
+            <Text style={styles.editButtonText}>✏️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.removeButton}
+            onPress={() => handleRemoveTeam(item)}
+          >
+            <Text style={styles.removeButtonText}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.playersInfo}>
@@ -221,6 +365,33 @@ const ChampionshipTeamsScreen = () => {
               selectionColor={theme.colors.primary}
             />
 
+            {/* Seção do Brasão */}
+            <Text style={styles.colorLabel}>Brasão do time:</Text>
+            <View style={styles.logoSection}>
+              {selectedImage ? (
+                <View style={styles.selectedImageContainer}>
+                  <Image
+                    source={{ uri: selectedImage }}
+                    style={styles.selectedImage}
+                  />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => setSelectedImage(null)}
+                  >
+                    <Text style={styles.removeImageButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.selectImageButton}
+                  onPress={selectTeamImage}
+                >
+                  <Text style={styles.selectImageButtonText}>📷</Text>
+                  <Text style={styles.selectImageText}>Selecionar Brasão</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             <Text style={styles.colorLabel}>Cor do colete:</Text>
 
             <TouchableOpacity
@@ -271,6 +442,7 @@ const ChampionshipTeamsScreen = () => {
                   setShowAddModal(false);
                   setTeamName("");
                   setNoColor(false);
+                  setSelectedImage(null);
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
@@ -280,6 +452,120 @@ const ChampionshipTeamsScreen = () => {
                 onPress={handleAddTeam}
               >
                 <Text style={styles.confirmButtonText}>Adicionar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para editar time */}
+      <Modal
+        visible={showEditModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Editar Time</Text>
+
+            <TextInput
+              style={[styles.input, { color: "#000000" }]}
+              placeholder="Nome do time"
+              value={teamName}
+              onChangeText={setTeamName}
+              placeholderTextColor="#666666"
+              selectionColor={theme.colors.primary}
+            />
+
+            {/* Seção do Brasão */}
+            <Text style={styles.colorLabel}>Brasão do time:</Text>
+            <View style={styles.logoSection}>
+              {selectedImage ? (
+                <View style={styles.selectedImageContainer}>
+                  <Image
+                    source={{ uri: selectedImage }}
+                    style={styles.selectedImage}
+                  />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => setSelectedImage(null)}
+                  >
+                    <Text style={styles.removeImageButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.selectImageButton}
+                  onPress={selectTeamImage}
+                >
+                  <Text style={styles.selectImageButtonText}>📷</Text>
+                  <Text style={styles.selectImageText}>Selecionar Brasão</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <Text style={styles.colorLabel}>Cor do colete:</Text>
+
+            <TouchableOpacity
+              style={[
+                styles.noColorOption,
+                noColor && styles.noColorOptionSelected,
+              ]}
+              onPress={() => setNoColor(!noColor)}
+            >
+              <Text
+                style={[
+                  styles.noColorText,
+                  noColor && styles.noColorTextSelected,
+                ]}
+              >
+                Sem cor específica
+              </Text>
+            </TouchableOpacity>
+
+            {!noColor && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.colorOptions}
+              >
+                {Object.entries(COLETE_CORES).map(([hex, name]) => (
+                  <TouchableOpacity
+                    key={hex}
+                    style={[
+                      styles.colorOption,
+                      selectedColor === hex && styles.selectedColorOption,
+                    ]}
+                    onPress={() => setSelectedColor(hex)}
+                  >
+                    <View
+                      style={[styles.colorCircle, { backgroundColor: hex }]}
+                    />
+                    <Text style={styles.colorOptionText}>{name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowEditModal(false);
+                  setEditingTeam(null);
+                  setTeamName("");
+                  setNoColor(false);
+                  setSelectedImage(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleUpdateTeam}
+              >
+                <Text style={styles.confirmButtonText}>Atualizar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -386,6 +672,35 @@ const styles = StyleSheet.create({
   teamInfo: {
     flex: 1,
   },
+  teamTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  teamLogo: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: theme.spacing.md,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  teamLogoPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: theme.colors.background,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: theme.spacing.md,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  teamLogoPlaceholderText: {
+    fontSize: 20,
+  },
+  teamDetails: {
+    flex: 1,
+  },
   teamName: {
     ...theme.typography.h3,
     color: theme.colors.text,
@@ -406,6 +721,17 @@ const styles = StyleSheet.create({
   colorName: {
     ...theme.typography.caption,
     color: theme.colors.textSecondary,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  editButton: {
+    padding: theme.spacing.sm,
+    marginRight: theme.spacing.xs,
+  },
+  editButtonText: {
+    fontSize: 18,
   },
   removeButton: {
     padding: theme.spacing.sm,
@@ -457,6 +783,57 @@ const styles = StyleSheet.create({
     ...theme.typography.label,
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
+  },
+  logoSection: {
+    marginBottom: theme.spacing.md,
+    alignItems: "center",
+  },
+  selectedImageContainer: {
+    position: "relative",
+    alignItems: "center",
+  },
+  selectedImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: theme.colors.error,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeImageButtonText: {
+    color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  selectImageButton: {
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    borderStyle: "dashed",
+    borderRadius: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    alignItems: "center",
+    backgroundColor: theme.colors.background,
+    minWidth: 120,
+  },
+  selectImageButtonText: {
+    fontSize: 24,
+    marginBottom: theme.spacing.xs,
+  },
+  selectImageText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
   },
   noColorOption: {
     backgroundColor: theme.colors.background,

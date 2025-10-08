@@ -9,6 +9,7 @@ import {
   TextInput,
   FlatList,
   Modal,
+  Image,
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
@@ -967,6 +968,12 @@ const ChampionshipMatchesScreen = () => {
         <View style={styles.matchHeader}>
           <View style={styles.teamsContainer}>
             <View style={styles.teamContainer}>
+              {homeTeam.logo && (
+                <Image
+                  source={{ uri: homeTeam.logo }}
+                  style={styles.teamLogo}
+                />
+              )}
               <Text style={styles.teamName}>{homeTeam.name || "Time"}</Text>
               {Boolean(homeTeam.color) && (
                 <View
@@ -979,6 +986,12 @@ const ChampionshipMatchesScreen = () => {
             </View>
             <Text style={styles.vsText}>vs</Text>
             <View style={styles.teamContainer}>
+              {awayTeam.logo && (
+                <Image
+                  source={{ uri: awayTeam.logo }}
+                  style={styles.teamLogo}
+                />
+              )}
               <Text style={styles.teamName}>{awayTeam.name || "Time"}</Text>
               {Boolean(awayTeam.color) && (
                 <View
@@ -2208,6 +2221,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
+  teamLogo: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   teamName: {
     ...theme.typography.body,
     color: theme.colors.text,
@@ -2789,6 +2810,10 @@ const QuickManualMatchModal = ({
     return teams.find((t) => t.id === teamId)?.color || "#cccccc";
   };
 
+  const getTeamLogo = (teamId: string) => {
+    return teams.find((t) => t.id === teamId)?.logo;
+  };
+
   if (!visible) return null;
 
   return (
@@ -2872,12 +2897,27 @@ const QuickManualMatchModal = ({
                 borderColor: selectedHomeTeam
                   ? getTeamColor(selectedHomeTeam)
                   : "#ddd",
+                flexDirection: "row",
+                justifyContent: "center",
               }}
               onPress={() => {
                 console.log("🔍 Debug - BOTÃO TIME DA CASA CLICADO!");
                 onSelectHomeTeam();
               }}
             >
+              {selectedHomeTeam && getTeamLogo(selectedHomeTeam) && (
+                <Image
+                  source={{ uri: getTeamLogo(selectedHomeTeam) }}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    marginRight: 8,
+                    borderWidth: 1,
+                    borderColor: "white",
+                  }}
+                />
+              )}
               <Text
                 style={{
                   color: selectedHomeTeam ? "white" : "#666",
@@ -2927,12 +2967,27 @@ const QuickManualMatchModal = ({
                 borderColor: selectedAwayTeam
                   ? getTeamColor(selectedAwayTeam)
                   : "#ddd",
+                flexDirection: "row",
+                justifyContent: "center",
               }}
               onPress={() => {
                 console.log("🔍 Debug - BOTÃO TIME VISITANTE CLICADO!");
                 onSelectAwayTeam();
               }}
             >
+              {selectedAwayTeam && getTeamLogo(selectedAwayTeam) && (
+                <Image
+                  source={{ uri: getTeamLogo(selectedAwayTeam) }}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    marginRight: 8,
+                    borderWidth: 1,
+                    borderColor: "white",
+                  }}
+                />
+              )}
               <Text
                 style={{
                   color: selectedAwayTeam ? "white" : "#666",
@@ -3135,18 +3190,33 @@ const TeamSelectorModal = ({
                       shadowOpacity: 0.2,
                       shadowRadius: 2,
                       elevation: 2,
+                      flexDirection: "row",
                     }}
                     onPress={() => {
                       console.log("🔍 Debug - Clicou no time:", team.name);
                       onSelect(team.id);
                     }}
                   >
+                    {team.logo && (
+                      <Image
+                        source={{ uri: team.logo }}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          marginRight: 8,
+                          borderWidth: 1,
+                          borderColor: "white",
+                        }}
+                      />
+                    )}
                     <Text
                       style={{
                         color: "white",
                         fontSize: 15,
                         fontWeight: "bold",
                         textAlign: "center",
+                        flex: 1,
                       }}
                     >
                       {team.name}

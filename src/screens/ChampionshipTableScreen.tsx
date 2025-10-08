@@ -1,5 +1,12 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, FlatList } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  FlatList,
+  Image,
+} from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { theme } from "../theme/theme";
@@ -128,6 +135,9 @@ const ChampionshipTableScreen = () => {
         {item.position}
       </Text>
       <View style={[styles.teamColumn, styles.teamInfo]}>
+        {item.team.logo && (
+          <Image source={{ uri: item.team.logo }} style={styles.teamLogo} />
+        )}
         <Text style={styles.teamName} numberOfLines={1}>
           {item.team.name}
         </Text>
@@ -271,9 +281,13 @@ const ChampionshipTableScreen = () => {
           <Text style={styles.championshipName}>
             {currentChampionship.name}
           </Text>
-          {currentChampionship.status === "finalizado" && currentChampionship.champion ? (
+          {currentChampionship.status === "finalizado" &&
+          currentChampionship.champion ? (
             <Text style={styles.championInfo}>
-              🏆 Campeão: {currentChampionship.teams.find(team => team.id === currentChampionship.champion)?.name || 'Time não encontrado'}
+              🏆 Campeão:{" "}
+              {currentChampionship.teams.find(
+                (team) => team.id === currentChampionship.champion
+              )?.name || "Time não encontrado"}
             </Text>
           ) : (
             <Text style={styles.matchesInfo}>
@@ -529,6 +543,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
     paddingHorizontal: theme.spacing.xs,
+  },
+  teamLogo: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   teamName: {
     ...theme.typography.caption,
