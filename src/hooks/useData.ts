@@ -227,6 +227,43 @@ export function useData() {
     }
   };
 
+  // Exportar dados
+  const exportData = async () => {
+    try {
+      return await dataService.exportData();
+    } catch (error) {
+      console.error("Erro ao exportar dados:", error);
+      throw error;
+    }
+  };
+
+  // Importar dados
+  const importData = async (jsonData: string) => {
+    try {
+      await dataService.importData(jsonData);
+      // Recarregar todos os dados após importar
+      await loadAllData();
+    } catch (error) {
+      console.error("Erro ao importar dados:", error);
+      throw error;
+    }
+  };
+
+  // Limpar todos os dados
+  const clearAllData = async () => {
+    try {
+      await dataService.clearAllData();
+      // Limpar estados locais
+      setPlayersState([]);
+      setTeamsState([]);
+      setGameResultsState([]);
+      setSavedDistributionsState([]);
+    } catch (error) {
+      console.error("Erro ao limpar dados:", error);
+      throw error;
+    }
+  };
+
   return {
     // State
     players,
@@ -239,6 +276,9 @@ export function useData() {
     // Methods
     loadAllData,
     syncData,
+    exportData,
+    importData,
+    clearAllData,
 
     // Players
     loadPlayers,

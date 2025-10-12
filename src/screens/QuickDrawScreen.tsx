@@ -45,12 +45,12 @@ const QuickDrawScreen = () => {
   const [players, setPlayers] = useState<QuickPlayer[]>([]);
   const [newPlayerName, setNewPlayerName] = useState("");
   const [newPlayerSkill, setNewPlayerSkill] = useState(3);
-  
+
   // Estados para gerenciar times
   const [teams, setTeams] = useState<QuickTeam[]>([]);
   const [numberOfTeams, setNumberOfTeams] = useState(2);
   const [balanceTeams, setBalanceTeams] = useState(true);
-  
+
   // Estados para gerenciar cores
   const [availableColors, setAvailableColors] = useState<string[]>([
     "#FF5252", // Vermelho
@@ -66,7 +66,7 @@ const QuickDrawScreen = () => {
   ]);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [currentColorIndex, setCurrentColorIndex] = useState(-1);
-  
+
   // Estados para funções específicas
   const [specificRoles, setSpecificRoles] = useState<SpecificRole[]>([
     { id: "1", name: "Goleiro" },
@@ -91,7 +91,7 @@ const QuickDrawScreen = () => {
       const savedPlayers = await AsyncStorage.getItem("quickDraw_players");
       const savedColors = await AsyncStorage.getItem("quickDraw_colors");
       const savedRoles = await AsyncStorage.getItem("quickDraw_roles");
-      
+
       if (savedPlayers) setPlayers(JSON.parse(savedPlayers));
       if (savedColors) setAvailableColors(JSON.parse(savedColors));
       if (savedRoles) setSpecificRoles(JSON.parse(savedRoles));
@@ -104,8 +104,14 @@ const QuickDrawScreen = () => {
   const saveData = async () => {
     try {
       await AsyncStorage.setItem("quickDraw_players", JSON.stringify(players));
-      await AsyncStorage.setItem("quickDraw_colors", JSON.stringify(availableColors));
-      await AsyncStorage.setItem("quickDraw_roles", JSON.stringify(specificRoles));
+      await AsyncStorage.setItem(
+        "quickDraw_colors",
+        JSON.stringify(availableColors)
+      );
+      await AsyncStorage.setItem(
+        "quickDraw_roles",
+        JSON.stringify(specificRoles)
+      );
     } catch (error) {
       console.error("Erro ao salvar dados:", error);
     }
@@ -132,16 +138,14 @@ const QuickDrawScreen = () => {
 
   // Remover jogador
   const removePlayer = (id: string) => {
-    setPlayers(players.filter(player => player.id !== id));
+    setPlayers(players.filter((player) => player.id !== id));
   };
 
   // Alternar seleção de jogador
   const togglePlayerSelection = (id: string) => {
     setPlayers(
-      players.map(player => 
-        player.id === id 
-          ? { ...player, selected: !player.selected } 
-          : player
+      players.map((player) =>
+        player.id === id ? { ...player, selected: !player.selected } : player
       )
     );
   };
@@ -164,15 +168,18 @@ const QuickDrawScreen = () => {
 
   // Remover função específica
   const removeSpecificRole = (id: string) => {
-    setSpecificRoles(specificRoles.filter(role => role.id !== id));
+    setSpecificRoles(specificRoles.filter((role) => role.id !== id));
   };
 
   // Sortear times
   const drawTeams = () => {
-    const selectedPlayers = players.filter(player => player.selected);
-    
+    const selectedPlayers = players.filter((player) => player.selected);
+
     if (selectedPlayers.length < numberOfTeams) {
-      Alert.alert("Erro", "Número de jogadores selecionados deve ser maior ou igual ao número de times");
+      Alert.alert(
+        "Erro",
+        "Número de jogadores selecionados deve ser maior ou igual ao número de times"
+      );
       return;
     }
 
@@ -189,25 +196,25 @@ const QuickDrawScreen = () => {
 
     // Clonar jogadores selecionados para não modificar o original
     let playersToDistribute = [...selectedPlayers];
-    
+
     // Ordenar por habilidade se balanceamento estiver ativado
     if (balanceTeams) {
       playersToDistribute.sort((a, b) => b.skill - a.skill);
-      
+
       // Distribuir jogadores em "serpentina" para equilibrar os times
       let teamIndex = 0;
       let direction = 1; // 1 para frente, -1 para trás
-      
+
       while (playersToDistribute.length > 0) {
         // Pegar o próximo jogador
         const player = playersToDistribute.shift();
         if (player) {
           newTeams[teamIndex].players.push(player);
         }
-        
+
         // Atualizar índice do time
         teamIndex += direction;
-        
+
         // Mudar direção se chegou ao final ou início
         if (teamIndex >= newTeams.length - 1) {
           direction = -1;
@@ -218,21 +225,42 @@ const QuickDrawScreen = () => {
     } else {
       // Embaralhar jogadores aleatoriamente
       playersToDistribute.sort(() => Math.random() - 0.5);
-      
+
       // Distribuir igualmente entre os times
       for (let i = 0; i < playersToDistribute.length; i++) {
         const teamIndex = i % newTeams.length;
         newTeams[teamIndex].players.push(playersToDistribute[i]);
       }
     }
-    
+
     setTeams(newTeams);
+
+    // Salvar no histórico
+    saveToHistory(
+      "teams",
+      "Sorteio de Times",
+      `${numberOfTeams} times com ${selectedPlayers.length} jogadores`,
+      selectedPlayers.map((p) => p.name),
+      {
+        teams: newTeams,
+        teamsByName: newTeams.reduce((acc, team) => {
+          acc[team.name] = team.players;
+          return acc;
+        }, {} as any),
+      },
+      {
+        balanceTeams,
+        numberOfTeams,
+        teamNames: newTeams.map((t) => t.name),
+        colors: newTeams.map((t) => t.color),
+      }
+    );
   };
 
   // Sortear funções específicas
   const drawSpecificRoles = () => {
-    const selectedPlayers = players.filter(player => player.selected);
-    
+    const selectedPlayers = players.filter((player) => player.selected);
+
     if (selectedPlayers.length === 0) {
       Alert.alert("Erro", "Selecione pelo menos um jogador");
       return;
@@ -240,10 +268,12 @@ const QuickDrawScreen = () => {
 
     // Clonar funções para não modificar o original
     const updatedRoles = [...specificRoles];
-    
+
     // Embaralhar jogadores
-    const shuffledPlayers = [...selectedPlayers].sort(() => Math.random() - 0.5);
-    
+    const shuffledPlayers = [...selectedPlayers].sort(
+      () => Math.random() - 0.5
+    );
+
     // Atribuir jogadores às funções
     updatedRoles.forEach((role, index) => {
       if (index < shuffledPlayers.length) {
@@ -252,30 +282,95 @@ const QuickDrawScreen = () => {
         role.assignedPlayer = undefined;
       }
     });
-    
+
     setSpecificRoles(updatedRoles);
+
+    // Salvar no histórico
+    const assignedRoles = updatedRoles.filter((role) => role.assignedPlayer);
+    saveToHistory(
+      "roles",
+      "Sorteio de Funções",
+      `${assignedRoles.length} funções atribuídas`,
+      selectedPlayers.map((p) => p.name),
+      {
+        roles: assignedRoles.map((role) => ({
+          role: role.name,
+          player: role.assignedPlayer?.name,
+        })),
+      }
+    );
+  };
+
+  // Salvar no histórico
+  const saveToHistory = async (
+    type: "teams" | "players" | "roles",
+    title: string,
+    description: string,
+    participants: string[],
+    results: any,
+    settings?: any
+  ) => {
+    try {
+      const historyItem = {
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        type,
+        title,
+        description,
+        participants,
+        results,
+        settings: settings || {},
+      };
+
+      const existingHistory = await AsyncStorage.getItem("quick_draw_history");
+      const history = existingHistory ? JSON.parse(existingHistory) : [];
+
+      // Adicionar novo item no início
+      history.unshift(historyItem);
+
+      // Manter apenas os últimos 50 itens para não sobrecarregar o storage
+      const limitedHistory = history.slice(0, 50);
+
+      await AsyncStorage.setItem(
+        "quick_draw_history",
+        JSON.stringify(limitedHistory)
+      );
+    } catch (error) {
+      console.error("Erro ao salvar histórico:", error);
+    }
   };
 
   // Limpar resultados
   const clearResults = () => {
     setTeams([]);
-    setSpecificRoles(specificRoles.map(role => ({ ...role, assignedPlayer: undefined })));
+    setSpecificRoles(
+      specificRoles.map((role) => ({ ...role, assignedPlayer: undefined }))
+    );
   };
 
   // Renderizar item de jogador
-  const renderPlayerItem = ({ item, index }: { item: QuickPlayer; index: number }) => (
+  const renderPlayerItem = ({
+    item,
+    index,
+  }: {
+    item: QuickPlayer;
+    index: number;
+  }) => (
     <View key={index} style={styles.playerItem}>
       <TouchableOpacity
-        style={[styles.playerCheckbox, item.selected && styles.playerCheckboxSelected]}
+        style={[
+          styles.playerCheckbox,
+          item.selected && styles.playerCheckboxSelected,
+        ]}
         onPress={() => togglePlayerSelection(item.id)}
       >
         {item.selected && <Ionicons name="checkmark" size={16} color="#fff" />}
       </TouchableOpacity>
-      
+
       <View style={styles.playerInfo}>
         <Text style={styles.playerName}>{item.name}</Text>
         <View style={styles.skillContainer}>
-          {[1, 2, 3, 4, 5].map(star => (
+          {[1, 2, 3, 4, 5].map((star) => (
             <Ionicons
               key={star}
               name="star"
@@ -285,7 +380,7 @@ const QuickDrawScreen = () => {
           ))}
         </View>
       </View>
-      
+
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => removePlayer(item.id)}
@@ -296,20 +391,36 @@ const QuickDrawScreen = () => {
   );
 
   // Renderizar item de time
-  const renderTeamItem = ({ item, index }: { item: QuickTeam; index: number }) => (
-    <View key={index} style={[styles.teamCard, { borderLeftColor: item.color, borderLeftWidth: 6 }]}>
+  const renderTeamItem = ({
+    item,
+    index,
+  }: {
+    item: QuickTeam;
+    index: number;
+  }) => (
+    <View
+      key={index}
+      style={[
+        styles.teamCard,
+        { borderLeftColor: item.color, borderLeftWidth: 6 },
+      ]}
+    >
       <View style={styles.teamHeader}>
-        <View style={[styles.teamColorIndicator, { backgroundColor: item.color }]} />
+        <View
+          style={[styles.teamColorIndicator, { backgroundColor: item.color }]}
+        />
         <Text style={styles.teamName}>{item.name}</Text>
-        <Text style={styles.teamPlayerCount}>{item.players.length} jogadores</Text>
+        <Text style={styles.teamPlayerCount}>
+          {item.players.length} jogadores
+        </Text>
       </View>
-      
+
       <View style={styles.teamPlayersList}>
-        {item.players.map(player => (
+        {item.players.map((player) => (
           <View key={player.id} style={styles.teamPlayerItem}>
             <Text style={styles.teamPlayerName}>{player.name}</Text>
             <View style={styles.teamPlayerSkill}>
-              {[1, 2, 3, 4, 5].map(star => (
+              {[1, 2, 3, 4, 5].map((star) => (
                 <Ionicons
                   key={star}
                   name="star"
@@ -325,17 +436,25 @@ const QuickDrawScreen = () => {
   );
 
   // Renderizar item de função específica
-  const renderRoleItem = ({ item, index }: { item: SpecificRole; index: number }) => (
+  const renderRoleItem = ({
+    item,
+    index,
+  }: {
+    item: SpecificRole;
+    index: number;
+  }) => (
     <View key={index} style={styles.roleItem}>
       <View style={styles.roleInfo}>
         <Text style={styles.roleName}>{item.name}</Text>
         {item.assignedPlayer ? (
-          <Text style={styles.roleAssignedPlayer}>{item.assignedPlayer.name}</Text>
+          <Text style={styles.roleAssignedPlayer}>
+            {item.assignedPlayer.name}
+          </Text>
         ) : (
           <Text style={styles.roleUnassigned}>Não atribuído</Text>
         )}
       </View>
-      
+
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => removeSpecificRole(item.id)}
@@ -353,12 +472,12 @@ const QuickDrawScreen = () => {
         icon="shuffle"
         theme="light"
       />
-      
+
       <ScrollView style={styles.content}>
         {/* Seção de Jogadores */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Jogadores</Text>
-          
+
           <View style={styles.addPlayerForm}>
             <TextInput
               style={styles.input}
@@ -366,11 +485,11 @@ const QuickDrawScreen = () => {
               value={newPlayerName}
               onChangeText={setNewPlayerName}
             />
-            
+
             <View style={styles.skillSelector}>
               <Text style={styles.skillLabel}>Nível:</Text>
               <View style={styles.starContainer}>
-                {[1, 2, 3, 4, 5].map(star => (
+                {[1, 2, 3, 4, 5].map((star) => (
                   <TouchableOpacity
                     key={star}
                     onPress={() => setNewPlayerSkill(star)}
@@ -378,38 +497,39 @@ const QuickDrawScreen = () => {
                     <Ionicons
                       name="star"
                       size={24}
-                      color={star <= newPlayerSkill ? "#FFD700" : theme.colors.border}
+                      color={
+                        star <= newPlayerSkill ? "#FFD700" : theme.colors.border
+                      }
                       style={styles.starIcon}
                     />
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
-            
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={addPlayer}
-            >
+
+            <TouchableOpacity style={styles.addButton} onPress={addPlayer}>
               <Ionicons name="add" size={24} color="#fff" />
               <Text style={styles.addButtonText}>Adicionar</Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.playersList}>
             {players.length === 0 ? (
               <Text style={styles.emptyListText}>
                 Nenhum jogador adicionado. Adicione jogadores para começar.
               </Text>
             ) : (
-              players.map((player, index) => renderPlayerItem({ item: player, index }))
+              players.map((player, index) =>
+                renderPlayerItem({ item: player, index })
+              )
             )}
           </View>
         </View>
-        
+
         {/* Seção de Configuração de Times */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Configuração de Times</Text>
-          
+
           <View style={styles.configRow}>
             <Text style={styles.configLabel}>Número de Times:</Text>
             <View style={styles.numberSelector}>
@@ -419,41 +539,43 @@ const QuickDrawScreen = () => {
               >
                 <Ionicons name="remove" size={20} color="#fff" />
               </TouchableOpacity>
-              
+
               <Text style={styles.numberValue}>{numberOfTeams}</Text>
-              
+
               <TouchableOpacity
                 style={styles.numberButton}
-                onPress={() => setNumberOfTeams(Math.min(10, numberOfTeams + 1))}
+                onPress={() =>
+                  setNumberOfTeams(Math.min(10, numberOfTeams + 1))
+                }
               >
                 <Ionicons name="add" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
-          
+
           <View style={styles.configRow}>
             <Text style={styles.configLabel}>Equilibrar Times:</Text>
             <Switch
               value={balanceTeams}
               onValueChange={setBalanceTeams}
-              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+              trackColor={{
+                false: theme.colors.border,
+                true: theme.colors.primary,
+              }}
               thumbColor={balanceTeams ? theme.colors.primary : "#f4f3f4"}
             />
           </View>
-          
-          <TouchableOpacity
-            style={styles.drawButton}
-            onPress={drawTeams}
-          >
+
+          <TouchableOpacity style={styles.drawButton} onPress={drawTeams}>
             <Ionicons name="shuffle" size={24} color="#fff" />
             <Text style={styles.drawButtonText}>Sortear Times</Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Seção de Cores */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Cores Disponíveis</Text>
-          
+
           <View style={styles.colorsContainer}>
             {availableColors.map((color, index) => (
               <TouchableOpacity
@@ -465,7 +587,7 @@ const QuickDrawScreen = () => {
                 }}
               />
             ))}
-            
+
             <TouchableOpacity
               style={styles.addColorButton}
               onPress={() => {
@@ -476,7 +598,7 @@ const QuickDrawScreen = () => {
               <Ionicons name="add" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
           </View>
-          
+
           {showColorPicker && (
             <View style={styles.colorPickerContainer}>
               <ColorPicker
@@ -491,18 +613,22 @@ const QuickDrawScreen = () => {
                     setAvailableColors([...availableColors, color]);
                   }
                 }}
-                initialColor={currentColorIndex >= 0 ? availableColors[currentColorIndex] : "#FF5252"}
+                initialColor={
+                  currentColorIndex >= 0
+                    ? availableColors[currentColorIndex]
+                    : "#FF5252"
+                }
                 visible={true}
                 onClose={() => setShowColorPicker(false)}
               />
             </View>
           )}
         </View>
-        
+
         {/* Seção de Funções Específicas */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Funções Específicas</Text>
-          
+
           <View style={styles.addRoleForm}>
             <TextInput
               style={styles.input}
@@ -510,7 +636,7 @@ const QuickDrawScreen = () => {
               value={newRoleName}
               onChangeText={setNewRoleName}
             />
-            
+
             <TouchableOpacity
               style={styles.addButton}
               onPress={addSpecificRole}
@@ -519,17 +645,19 @@ const QuickDrawScreen = () => {
               <Text style={styles.addButtonText}>Adicionar</Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.rolesList}>
             {specificRoles.length === 0 ? (
               <Text style={styles.emptyListText}>
                 Nenhuma função adicionada. Adicione funções para começar.
               </Text>
             ) : (
-              specificRoles.map((role, index) => renderRoleItem({ item: role, index }))
+              specificRoles.map((role, index) =>
+                renderRoleItem({ item: role, index })
+              )
             )}
           </View>
-          
+
           <TouchableOpacity
             style={styles.drawButton}
             onPress={drawSpecificRoles}
@@ -538,7 +666,7 @@ const QuickDrawScreen = () => {
             <Text style={styles.drawButtonText}>Sortear Funções</Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Resultados do Sorteio de Times */}
         {teams.length > 0 && (
           <View style={styles.section}>
@@ -552,9 +680,11 @@ const QuickDrawScreen = () => {
                 <Text style={styles.clearButtonText}>Limpar</Text>
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.teamsList}>
-              {teams.map((team, index) => renderTeamItem({ item: team, index }))}
+              {teams.map((team, index) =>
+                renderTeamItem({ item: team, index })
+              )}
             </View>
           </View>
         )}

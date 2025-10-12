@@ -144,9 +144,9 @@ function HomeScreen() {
               <View style={styles.userInfo}>
                 <Ionicons name="person-circle" size={20} color="#fff" />
                 <Text style={styles.userText}>
-                  {user.displayName || user.email || 'Usuário'}
+                  {user.displayName || user.email || "Usuário"}
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.logoutButton}
                   onPress={handleLogout}
                   accessibilityLabel="Sair da conta"
@@ -162,18 +162,18 @@ function HomeScreen() {
         <View style={styles.connectivityContainer}>
           <View style={styles.connectivityCard}>
             <View style={styles.connectivityHeader}>
-              <Ionicons 
-                name={isOnline ? "wifi" : "cloud-offline-outline"} 
-                size={24} 
-                color={isOnline ? "#4CAF50" : "#FF5722"} 
+              <Ionicons
+                name={isOnline ? "wifi" : "cloud-offline-outline"}
+                size={24}
+                color={isOnline ? "#4CAF50" : "#FF5722"}
               />
               <Text style={styles.connectivityTitle}>
                 {isOnline ? "Online" : "Modo Offline"}
               </Text>
             </View>
             <Text style={styles.connectivityDescription}>
-              {isOnline 
-                ? "Conectado à internet. Dados sincronizados automaticamente." 
+              {isOnline
+                ? "Conectado à internet. Dados sincronizados automaticamente."
                 : "Sem conexão. Usando dados salvos localmente."}
             </Text>
             {!isOnline && (
@@ -186,9 +186,10 @@ function HomeScreen() {
             )}
             {lastSync && (
               <Text style={styles.lastSyncText}>
-                Última sincronização: {lastSync.toLocaleTimeString('pt-BR', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
+                Última sincronização:{" "}
+                {lastSync.toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
                 })}
               </Text>
             )}
@@ -343,6 +344,74 @@ function HomeScreen() {
               </View>
             </LinearGradient>
           </TouchableOpacity>
+        </View>
+
+        {/* Menu de Funcionalidades Adicionais */}
+        <View style={styles.additionalFeaturesContainer}>
+          <Text style={styles.featuresTitle}>🚀 Funcionalidades</Text>
+          <View style={styles.featuresGrid}>
+            {/* Estatísticas */}
+            <TouchableOpacity
+              style={styles.featureCard}
+              onPress={() => navigation.navigate("Stats")}
+            >
+              <View
+                style={[styles.featureIcon, { backgroundColor: "#E3F2FD" }]}
+              >
+                <Ionicons name="stats-chart" size={24} color="#1976D2" />
+              </View>
+              <Text style={styles.featureCardTitle}>Estatísticas</Text>
+              <Text style={styles.featureCardDescription}>
+                Rankings e performance
+              </Text>
+            </TouchableOpacity>
+
+            {/* Histórico */}
+            <TouchableOpacity
+              style={styles.featureCard}
+              onPress={() => navigation.navigate("History")}
+            >
+              <View
+                style={[styles.featureIcon, { backgroundColor: "#F3E5F5" }]}
+              >
+                <Ionicons name="time" size={24} color="#7B1FA2" />
+              </View>
+              <Text style={styles.featureCardTitle}>Histórico</Text>
+              <Text style={styles.featureCardDescription}>
+                Sorteios anteriores
+              </Text>
+            </TouchableOpacity>
+
+            {/* Configurações */}
+            <TouchableOpacity
+              style={styles.featureCard}
+              onPress={() => navigation.navigate("Settings")}
+            >
+              <View
+                style={[styles.featureIcon, { backgroundColor: "#E8F5E8" }]}
+              >
+                <Ionicons name="settings" size={24} color="#388E3C" />
+              </View>
+              <Text style={styles.featureCardTitle}>Configurações</Text>
+              <Text style={styles.featureCardDescription}>
+                Preferências e backup
+              </Text>
+            </TouchableOpacity>
+
+            {/* Tutorial */}
+            <TouchableOpacity
+              style={styles.featureCard}
+              onPress={() => navigation.navigate("Onboarding")}
+            >
+              <View
+                style={[styles.featureIcon, { backgroundColor: "#FFF3E0" }]}
+              >
+                <Ionicons name="help-circle" size={24} color="#F57C00" />
+              </View>
+              <Text style={styles.featureCardTitle}>Tutorial</Text>
+              <Text style={styles.featureCardDescription}>Como usar o app</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </LinearGradient>
@@ -587,6 +656,60 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#fff",
+  },
+  // Additional Features Styles
+  additionalFeaturesContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  featuresTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 20,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  featuresGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  featureCard: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: 16,
+    padding: 16,
+    width: "47%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  featureIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  featureCardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  featureCardDescription: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 16,
   },
   connectivityDescription: {
     fontSize: 14,
