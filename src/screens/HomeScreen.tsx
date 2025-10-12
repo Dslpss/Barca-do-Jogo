@@ -147,6 +147,19 @@ function HomeScreen() {
                   {user.displayName || user.email || "Usuário"}
                 </Text>
                 <TouchableOpacity
+                  style={styles.syncIconButton}
+                  onPress={handleSync}
+                  disabled={isLoading}
+                  accessibilityLabel="Sincronizar dados"
+                >
+                  <Ionicons
+                    name={isLoading ? "refresh" : "sync"}
+                    size={18}
+                    color="#fff"
+                    style={isLoading ? styles.rotating : {}}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={styles.logoutButton}
                   onPress={handleLogout}
                   accessibilityLabel="Sair da conta"
@@ -158,42 +171,68 @@ function HomeScreen() {
           )}
         </View>
 
-        {/* Card de Status de Conectividade */}
-        <View style={styles.connectivityContainer}>
-          <View style={styles.connectivityCard}>
-            <View style={styles.connectivityHeader}>
-              <Ionicons
-                name={isOnline ? "wifi" : "cloud-offline-outline"}
-                size={24}
-                color={isOnline ? "#4CAF50" : "#FF5722"}
-              />
-              <Text style={styles.connectivityTitle}>
-                {isOnline ? "Online" : "Modo Offline"}
-              </Text>
-            </View>
-            <Text style={styles.connectivityDescription}>
-              {isOnline
-                ? "Conectado à internet. Dados sincronizados automaticamente."
-                : "Sem conexão. Usando dados salvos localmente."}
-            </Text>
-            {!isOnline && (
-              <View style={styles.offlineWarning}>
-                <Ionicons name="information-circle" size={16} color="#FF9800" />
-                <Text style={styles.offlineWarningText}>
-                  Algumas funcionalidades podem estar limitadas
-                </Text>
+        {/* Card Principal do Sistema de Campeonatos */}
+        <View style={styles.mainActionContainer}>
+          <TouchableOpacity
+            style={styles.championshipButton}
+            onPress={() => navigation.navigate("ChampionshipIntro")}
+            activeOpacity={0.9}
+          >
+            <LinearGradient
+              colors={["#667eea", "#764ba2"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.championshipGradient}
+            >
+              <View style={styles.championshipContent}>
+                <View style={styles.championshipHeader}>
+                  <View style={styles.championshipIconLarge}>
+                    <Ionicons name="trophy" size={30} color="#FFD700" />
+                  </View>
+                  <View style={styles.championshipInfo}>
+                    <Text style={styles.championshipTitle}>
+                      Sistema de Campeonatos
+                    </Text>
+                    <Text style={styles.championshipDescription}>
+                      Organize competições profissionais completas
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={22} color="#fff" />
+                </View>
+
+                <View style={styles.featuresContainer}>
+                  <View style={styles.featureTag}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.featureTagText}>Times Fixos</Text>
+                  </View>
+                  <View style={styles.featureTag}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.featureTagText}>
+                      Classificação Automática
+                    </Text>
+                  </View>
+                  <View style={styles.featureTag}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.featureTagText}>
+                      Múltiplos Campeonatos
+                    </Text>
+                  </View>
+                </View>
               </View>
-            )}
-            {lastSync && (
-              <Text style={styles.lastSyncText}>
-                Última sincronização:{" "}
-                {lastSync.toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </Text>
-            )}
-          </View>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
         {/* Cards de Estatísticas */}
@@ -240,110 +279,6 @@ function HomeScreen() {
               <Text style={styles.statLabel}>Partidas Jogadas</Text>
             </View>
           </View>
-        </View>
-
-        {/* Card Principal do Sistema de Campeonatos */}
-        <View style={styles.mainActionContainer}>
-          <TouchableOpacity
-            style={styles.championshipButton}
-            onPress={() => navigation.navigate("ChampionshipIntro")}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={["#667eea", "#764ba2"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.championshipGradient}
-            >
-              <View style={styles.championshipContent}>
-                <View style={styles.championshipHeader}>
-                  <View style={styles.championshipIconLarge}>
-                    <Ionicons name="trophy" size={40} color="#FFD700" />
-                  </View>
-                  <View style={styles.championshipInfo}>
-                    <Text style={styles.championshipTitle}>
-                      Sistema de Campeonatos
-                    </Text>
-                    <Text style={styles.championshipDescription}>
-                      Organize competições profissionais completas
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={28} color="#fff" />
-                </View>
-
-                <View style={styles.featuresContainer}>
-                  <View style={styles.featureTag}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color="#4CAF50"
-                    />
-                    <Text style={styles.featureTagText}>Times Fixos</Text>
-                  </View>
-                  <View style={styles.featureTag}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color="#4CAF50"
-                    />
-                    <Text style={styles.featureTagText}>
-                      Classificação Automática
-                    </Text>
-                  </View>
-                  <View style={styles.featureTag}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color="#4CAF50"
-                    />
-                    <Text style={styles.featureTagText}>
-                      Múltiplos Campeonatos
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Botão de Sincronização Manual */}
-        <View style={styles.syncContainer}>
-          <TouchableOpacity
-            style={styles.syncButton}
-            onPress={handleSync}
-            disabled={isLoading}
-          >
-            <Ionicons
-              name={isLoading ? "refresh" : "sync"}
-              size={20}
-              color="#fff"
-              style={isLoading ? styles.rotating : {}}
-            />
-            <Text style={styles.syncButtonText}>
-              {isLoading ? "Sincronizando..." : "Sincronizar Dados"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Botão de Sorteio Rápido */}
-        <View style={styles.quickDrawContainer}>
-          <TouchableOpacity
-            style={styles.quickDrawButton}
-            onPress={() => navigation.navigate("QuickDraw")}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={["#00b09b", "#96c93d"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.quickDrawGradient}
-            >
-              <View style={styles.quickDrawContent}>
-                <Ionicons name="shuffle" size={24} color="#fff" />
-                <Text style={styles.quickDrawText}>Sorteio Rápido</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
         </View>
 
         {/* Menu de Funcionalidades Adicionais */}
@@ -412,6 +347,27 @@ function HomeScreen() {
               <Text style={styles.featureCardDescription}>Como usar o app</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Botão de Sorteio Rápido */}
+        <View style={styles.quickDrawContainer}>
+          <TouchableOpacity
+            style={styles.quickDrawButton}
+            onPress={() => navigation.navigate("QuickDraw")}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={["#00b09b", "#96c93d"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.quickDrawGradient}
+            >
+              <View style={styles.quickDrawContent}>
+                <Ionicons name="shuffle" size={24} color="#fff" />
+                <Text style={styles.quickDrawText}>Sorteio Rápido</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </LinearGradient>
@@ -532,20 +488,20 @@ const styles = StyleSheet.create({
     elevation: 15,
   },
   championshipGradient: {
-    padding: 25,
+    padding: 16,
   },
   championshipContent: {
-    gap: 20,
+    gap: 12,
   },
   championshipHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 15,
+    gap: 12,
   },
   championshipIconLarge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
     backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
@@ -554,56 +510,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   championshipTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#fff",
-    marginBottom: 5,
+    marginBottom: 4,
   },
   championshipDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#fff",
     opacity: 0.9,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   // Features Container
   featuresContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
   },
   featureTag: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.15)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 20,
-    gap: 6,
+    gap: 5,
   },
   featureTagText: {
     fontSize: 12,
     color: "#fff",
-    fontWeight: "500",
-  },
-  // Sync Container
-  syncContainer: {
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  syncButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
-  },
-  syncButtonText: {
-    color: "#fff",
-    fontSize: 14,
     fontWeight: "500",
   },
   rotating: {
@@ -628,34 +563,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
+  syncIconButton: {
+    padding: 5,
+    borderRadius: 5,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
   logoutButton: {
     marginLeft: 10,
     padding: 5,
     borderRadius: 5,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  // Connectivity Container
-  connectivityContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
-  },
-  connectivityCard: {
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  connectivityHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  connectivityTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
   },
   // Additional Features Styles
   additionalFeaturesContainer: {
@@ -710,35 +627,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     textAlign: "center",
     lineHeight: 16,
-  },
-  connectivityDescription: {
-    fontSize: 14,
-    color: "#fff",
-    opacity: 0.9,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  offlineWarning: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(255, 152, 0, 0.15)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  offlineWarningText: {
-    fontSize: 12,
-    color: "#FF9800",
-    fontWeight: "500",
-    flex: 1,
-  },
-  lastSyncText: {
-    fontSize: 12,
-    color: "#fff",
-    opacity: 0.7,
-    fontStyle: "italic",
   },
   // Estilos para o botão de sorteio rápido
   quickDrawContainer: {
