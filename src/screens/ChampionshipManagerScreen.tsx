@@ -10,7 +10,10 @@ import {
   Modal,
   FlatList,
   RefreshControl,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { ChampionshipService } from "../services/championshipService";
 import { useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../components/AppHeader";
@@ -28,6 +31,7 @@ const ChampionshipManagerScreen = () => {
     createChampionship,
     selectChampionship,
     loadChampionships,
+    loadCurrentChampionship,
     pauseChampionship,
     resumeChampionship,
     finishChampionship,
@@ -40,6 +44,7 @@ const ChampionshipManagerScreen = () => {
   const [selectedType, setSelectedType] = useState<
     "pontos_corridos" | "mata_mata" | "grupos"
   >("pontos_corridos");
+  const [pickingLogo, setPickingLogo] = useState(false);
 
   React.useEffect(() => {
     if (isFocused) {
@@ -79,6 +84,61 @@ const ChampionshipManagerScreen = () => {
       Alert.alert("Sucesso", "Campeonato criado com sucesso!");
     } catch (error) {
       Alert.alert("Erro", "Erro ao criar campeonato");
+    }
+  };
+
+  const handlePickChampionshipLogo = async () => {
+    try {
+      setPickingLogo(true);
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permissão necessária",
+          "Precisamos de permissão para acessar suas fotos para selecionar o logo do campeonato."
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.3,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const base64 = result.assets[0].base64;
+        if (base64) {
+          // até 1MB
+          const sizeInBytes = (base64.length * 3) / 4;
+          if (sizeInBytes > 1 * 1024 * 1024) {
+            Alert.alert(
+              "Imagem muito grande",
+              "Selecione uma imagem menor que 1MB."
+            );
+            return;
+          }
+          const dataUri = `data:image/jpeg;base64,${base64}`;
+          if (!currentChampionship) {
+            Alert.alert("Erro", "Nenhum campeonato selecionado");
+            return;
+          }
+          const updated = {
+            ...currentChampionship,
+            logo: dataUri,
+          } as Championship;
+          await ChampionshipService.updateChampionship(updated);
+          await Promise.all([loadChampionships(), loadCurrentChampionship()]);
+          Alert.alert("Sucesso", "Logo do campeonato atualizado!");
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao selecionar logo:", e);
+      Alert.alert("Erro", "Não foi possível selecionar o logo");
+    } finally {
+      setPickingLogo(false);
     }
   };
 
@@ -317,12 +377,16 @@ const ChampionshipManagerScreen = () => {
       >
         <View style={styles.championshipHeader}>
           <View style={styles.nameRow}>
-            <Ionicons
-              name={isSelected ? "trophy" : "football-outline"}
-              size={18}
-              color={theme.colors.text}
-              style={{ marginRight: 8, opacity: 0.9 }}
-            />
+            {item.logo ? (
+              <Image source={{ uri: item.logo }} style={styles.listChampLogo} />
+            ) : (
+              <Ionicons
+                name={isSelected ? "trophy" : "football-outline"}
+                size={18}
+                color={theme.colors.text}
+                style={{ marginRight: 8, opacity: 0.9 }}
+              />
+            )}
             <Text style={styles.championshipName}>
               {item.name}
               {hasEmptyId ? " ⚠️" : ""}
@@ -512,6 +576,45 @@ const ChampionshipManagerScreen = () => {
               <Text> • </Text>
               {getStatusLabel(currentChampionship.status)}
             </Text>
+
+            {/* Logo do campeonato */}
+            <View style={styles.logoRow}>
+              {currentChampionship.logo ? (
+                <Image
+                  source={{ uri: currentChampionship.logo }}
+                  style={styles.champLogo}
+                />
+              ) : (
+                <View style={styles.champLogoPlaceholder}>
+                  <Text style={styles.champLogoPlaceholderText}>🏆</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.headerButton,
+                  styles.createNewButton,
+                  { height: 36, marginLeft: 8 },
+                ]}
+                onPress={handlePickChampionshipLogo}
+                disabled={!!loading || pickingLogo}
+              >
+                <View style={styles.headerBtnContent}>
+                  <Ionicons
+                    name="image"
+                    size={16}
+                    color="white"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.headerButtonText}>
+                    {pickingLogo
+                      ? "Atualizando..."
+                      : currentChampionship.logo
+                      ? "Trocar Logo"
+                      : "Adicionar Logo"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -736,6 +839,33 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     opacity: 0.9,
   },
+  logoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: theme.spacing.sm,
+  },
+  champLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
+  },
+  champLogoPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  champLogoPlaceholderText: {
+    color: "#fff",
+    fontSize: 20,
+  },
   header: {
     marginBottom: theme.spacing.sm,
   },
@@ -891,6 +1021,15 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     fontSize: 10,
     fontWeight: "bold",
+  },
+  listChampLogo: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    marginRight: 8,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   championshipInfo: {
     marginBottom: theme.spacing.sm,

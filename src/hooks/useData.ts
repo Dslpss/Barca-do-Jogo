@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   dataService,
   Player,
@@ -230,9 +231,71 @@ export function useData() {
   // Exportar dados
   const exportData = async () => {
     try {
-      return await dataService.exportData();
+      console.log("🔍 Debug: dataService:", dataService);
+      console.log(
+        "🔍 Debug: dataService.exportData:",
+        (dataService as any).exportData
+      );
+      console.log("🔍 Debug: typeof dataService:", typeof dataService);
+      console.log("🔍 Debug: dataService keys:", Object.keys(dataService));
+      console.log(
+        "🔍 Debug: dataService constructor:",
+        dataService.constructor.name
+      );
+
+      // Usar método oficial se disponível
+      if (typeof (dataService as any).exportData === "function") {
+        return await (dataService as any).exportData();
+      }
+
+      // Fallback: gerar backup diretamente do AsyncStorage
+      console.warn(
+        "⚠️ dataService.exportData indisponível. Usando fallback local."
+      );
+      const [
+        players,
+        teams,
+        gameResultsResultados,
+        gameResultsOld,
+        distributions,
+        history,
+        settings,
+      ] = await Promise.all([
+        AsyncStorage.getItem("players"),
+        AsyncStorage.getItem("teams"),
+        // Preferir a chave atual usada pelo app e manter compatibilidade com a antiga
+        AsyncStorage.getItem("resultados_jogos"),
+        AsyncStorage.getItem("gameResults"),
+        AsyncStorage.getItem("savedDistributions"),
+        AsyncStorage.getItem("quick_draw_history"),
+        AsyncStorage.getItem("app_settings"),
+      ]);
+
+      const payload = {
+        version: "1.0.0",
+        timestamp: new Date().toISOString(),
+        data: {
+          players: players ? JSON.parse(players) : [],
+          teams: teams ? JSON.parse(teams) : [],
+          gameResults:
+            gameResultsResultados || gameResultsOld
+              ? JSON.parse(gameResultsResultados || gameResultsOld!)
+              : [],
+          distributions: distributions ? JSON.parse(distributions) : [],
+          history: history ? JSON.parse(history) : [],
+          settings: settings ? JSON.parse(settings) : {},
+        },
+      };
+
+      return JSON.stringify(payload, null, 2);
     } catch (error) {
       console.error("Erro ao exportar dados:", error);
+      try {
+        // Melhorar logs em ambientes onde "error" pode não ser Error
+        const anyErr = error as any;
+        if (anyErr?.message) console.error("Erro detalhado:", anyErr.message);
+        if (anyErr?.stack) console.error("Stack trace:", anyErr.stack);
+      } catch {}
       throw error;
     }
   };
@@ -240,7 +303,7 @@ export function useData() {
   // Importar dados
   const importData = async (jsonData: string) => {
     try {
-      await dataService.importData(jsonData);
+      await (dataService as any).importData(jsonData);
       // Recarregar todos os dados após importar
       await loadAllData();
     } catch (error) {
@@ -252,7 +315,7 @@ export function useData() {
   // Limpar todos os dados
   const clearAllData = async () => {
     try {
-      await dataService.clearAllData();
+      await (dataService as any).clearAllData();
       // Limpar estados locais
       setPlayersState([]);
       setTeamsState([]);

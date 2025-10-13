@@ -85,6 +85,7 @@ export interface Championship {
   name: string;
   type: "pontos_corridos" | "mata_mata" | "grupos";
   status: "criado" | "em_andamento" | "pausado" | "finalizado";
+  logo?: string; // URI da imagem do logo do campeonato (data URI base64)
   teams: Team[];
   matches: Match[];
   groups?: Group[]; // Grupos para campeonatos por fase de grupos

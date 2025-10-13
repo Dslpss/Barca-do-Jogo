@@ -326,6 +326,48 @@ export class ChampionshipService {
     return newChampionship;
   }
 
+  // Compatibilidade: criar campeonato a partir de um objeto de dados já estruturado
+  // Usado pela fila offline quando recriando a partir de backup/queue
+  static async createChampionshipFromData(
+    data: Partial<Championship>
+  ): Promise<Championship> {
+    const userId = this.getUserId();
+    if (!userId) {
+      throw new Error("Usuário não autenticado");
+    }
+
+    if (!(await this.isOnline())) {
+      throw new Error("Não é possível criar campeonato - offline");
+    }
+
+    // Se já vier com id válido, usamos; senão geramos um novo
+    const ref = data.id
+      ? doc(db, "championships", data.id)
+      : doc(collection(db, "championships"));
+    const id = data.id || ref.id;
+
+    const now = new Date().toISOString();
+    const championship: Championship = {
+      id,
+      name: (data as any).name || "Campeonato",
+      type: (data as any).type || "pontos_corridos",
+      status: (data as any).status || "criado",
+      teams: (data as any).teams || [],
+      matches: (data as any).matches || [],
+      createdAt: (data as any).createdAt || now,
+      updatedAt: now,
+    };
+
+    const championshipData = this.cleanUndefinedFields({
+      ...championship,
+      userId,
+      updatedAt: now,
+    });
+
+    await setDoc(ref, championshipData);
+    return championship;
+  }
+
   // Obter campeonato por ID
   static async getChampionshipById(id: string): Promise<Championship | null> {
     console.log("🔍 Service: Buscando campeonato por ID:", id);

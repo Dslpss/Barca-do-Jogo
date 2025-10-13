@@ -33,8 +33,10 @@ function HomeScreen() {
   } = useData();
   const {
     championships,
+    currentChampionship,
     syncData: syncChampionships,
     loadChampionships,
+    loadCurrentChampionship,
   } = useChampionship();
   const [lastSync, setLastSync] = useState<Date | undefined>();
 
@@ -88,6 +90,7 @@ function HomeScreen() {
       // Recarregar tanto os dados antigos quanto os novos campeonatos
       loadAllData();
       loadChampionships(); // Carregar campeonatos ativos diretamente
+      loadCurrentChampionship(); // Garantir que o campeonato atual está atualizado
     }
   }, [isFocused, user]);
 
@@ -235,6 +238,35 @@ function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Campeonato Atual com Logo - AGORA ABAIXO DO SISTEMA DE CAMPEONATOS */}
+        {currentChampionship && (
+          <View style={styles.currentChampCard}>
+            <View style={styles.currentChampRow}>
+              {currentChampionship.logo ? (
+                <Image
+                  source={{ uri: currentChampionship.logo }}
+                  style={styles.currentChampLogo}
+                  accessibilityLabel="Logo do campeonato"
+                />
+              ) : (
+                <View style={styles.currentChampLogoPlaceholder}>
+                  <Ionicons name="trophy" size={18} color="#fff" />
+                </View>
+              )}
+              <View style={styles.currentChampInfo}>
+                <Text style={styles.currentChampName} numberOfLines={1}>
+                  {currentChampionship.name}
+                </Text>
+                <Text style={styles.currentChampMeta}>
+                  {currentChampionship.type.replace("_", " ")}
+                  <Text> • </Text>
+                  {currentChampionship.status.replace("_", " ")}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Cards de Estatísticas */}
         <View style={styles.statsContainer}>
           <Text style={styles.statsTitle}>📊 Estatísticas Gerais</Text>
@@ -381,6 +413,54 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingBottom: 30,
+  },
+  currentChampCard: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  currentChampRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  currentChampLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
+    marginRight: 10,
+  },
+  currentChampLogoPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  currentChampInfo: {
+    flex: 1,
+  },
+  currentChampName: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  currentChampMeta: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 12,
+    marginTop: 2,
+    textTransform: "capitalize",
   },
   // Header Styles
   headerContainer: {

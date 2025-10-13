@@ -9,7 +9,9 @@ import {
   Switch,
   Modal,
   TextInput,
+  Share,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../components/AppHeader";
@@ -38,6 +40,7 @@ const SettingsScreen = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState("");
+  const [exportedData, setExportedData] = useState("");
   const [settings, setSettings] = useState({
     darkMode: false,
     notifications: true,
@@ -78,6 +81,7 @@ const SettingsScreen = () => {
   const handleExportData = async () => {
     try {
       const data = await exportData();
+      setExportedData(data);
       setShowExportModal(true);
     } catch (error) {
       Alert.alert("Erro", "Não foi possível exportar os dados");
@@ -97,6 +101,41 @@ const SettingsScreen = () => {
       Alert.alert("Sucesso", "Dados importados com sucesso!");
     } catch (error) {
       Alert.alert("Erro", "Dados de backup inválidos");
+    }
+  };
+
+  const handleShareBackup = async () => {
+    try {
+      const today = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
+      await Share.share({
+        message: exportedData,
+        title: `Backup Barca do Jogo - ${today}`,
+      });
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível compartilhar o backup");
+    }
+  };
+
+  const handleCopyBackup = async () => {
+    try {
+      await Clipboard.setStringAsync(exportedData);
+      Alert.alert("Sucesso", "Backup copiado para a área de transferência!");
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível copiar o backup");
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const clipboardContent = await Clipboard.getStringAsync();
+      if (clipboardContent) {
+        setImportText(clipboardContent);
+        Alert.alert("Sucesso", "Dados colados do clipboard!");
+      } else {
+        Alert.alert("Aviso", "Não há dados na área de transferência");
+      }
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível colar do clipboard");
     }
   };
 
@@ -319,12 +358,32 @@ const SettingsScreen = () => {
             </Text>
             <ScrollView style={styles.exportText}>
               <Text selectable style={styles.exportData}>
-                {/* Aqui seria o JSON dos dados exportados */}
-                Dados de backup serão exibidos aqui...
+                {exportedData || "Gerando backup..."}
               </Text>
             </ScrollView>
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.shareButton]}
+                onPress={handleShareBackup}
+                disabled={!exportedData}
+              >
+                <Ionicons name="share-outline" size={20} color="white" />
+                <Text style={styles.modalButtonText}>Compartilhar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.copyButton]}
+                onPress={handleCopyBackup}
+                disabled={!exportedData}
+              >
+                <Ionicons name="copy-outline" size={20} color="white" />
+                <Text style={styles.modalButtonText}>Copiar</Text>
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
-              style={styles.modalButton}
+              style={[styles.modalButton, styles.closeButton]}
               onPress={() => setShowExportModal(false)}
             >
               <Text style={styles.modalButtonText}>Fechar</Text>
@@ -346,6 +405,15 @@ const SettingsScreen = () => {
             <Text style={styles.modalDescription}>
               Cole os dados de backup no campo abaixo:
             </Text>
+
+            <TouchableOpacity
+              style={[styles.modalButton, styles.pasteButton]}
+              onPress={handlePasteFromClipboard}
+            >
+              <Ionicons name="clipboard-outline" size={20} color="white" />
+              <Text style={styles.modalButtonText}>Colar do Clipboard</Text>
+            </TouchableOpacity>
+
             <TextInput
               style={styles.importInput}
               multiline
@@ -544,6 +612,30 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: "600",
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+  },
+  shareButton: {
+    backgroundColor: "#007AFF",
+    flexDirection: "row",
+    gap: 8,
+  },
+  copyButton: {
+    backgroundColor: "#FF9500",
+    flexDirection: "row",
+    gap: 8,
+  },
+  closeButton: {
+    backgroundColor: theme.colors.border,
+  },
+  pasteButton: {
+    backgroundColor: "#34C759",
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
   },
 });
 

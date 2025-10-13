@@ -884,6 +884,9 @@ const ChampionshipMatchesScreen = () => {
         <Text style={modalStyles.goalScorersTitle}>
           {teamData.name || "Time"}:
         </Text>
+        <Text style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+          Toque no nome do jogador para adicionar gol ou cartão
+        </Text>
         <View style={styles.goalScorersGrid}>
           {teamData.players.map((player) => {
             const playerScorer = selectedScorers.find(
@@ -1286,7 +1289,24 @@ const ChampionshipMatchesScreen = () => {
         <View style={styles.championshipInfo}>
           <View style={styles.championshipHeader}>
             <View style={styles.championshipTitleContainer}>
-              <Text style={styles.championshipIcon}>🏆</Text>
+              {/* Logo do campeonato */}
+              {currentChampionship.logo ? (
+                <Image
+                  source={{ uri: currentChampionship.logo }}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    marginRight: 10,
+                    backgroundColor: "#eee",
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                  }}
+                  accessibilityLabel="Logo do campeonato"
+                />
+              ) : (
+                <Text style={styles.championshipIcon}>🏆</Text>
+              )}
               <View style={styles.championshipTitleSection}>
                 <Text style={styles.championshipName}>
                   {currentChampionship.name || "Campeonato"}
