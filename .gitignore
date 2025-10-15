@@ -36,3 +36,10 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# .NET
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
