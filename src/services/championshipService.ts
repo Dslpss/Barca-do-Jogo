@@ -928,33 +928,60 @@ export class ChampionshipService {
     championship.matchGenerationOptions = options;
 
     if (options?.type === "manual" && options.manualMatches) {
-      // Geração manual de partidas
+      // Geração manual de partidas - NÃO GERA MATA-MATA AUTOMATICAMENTE
       console.log("🎯 Gerando partidas manualmente...");
       newMatches = this.generateManualMatches(options.manualMatches, teams);
+
+      // Adicionar partidas e retornar SEM processar lógica de fases
+      championship.matches = [...championship.matches, ...newMatches];
+      championship.status = "em_andamento";
+      await this.updateChampionship(championship);
+      console.log(`✅ ${newMatches.length} partidas manuais adicionadas!`);
+      return;
     } else if (options?.type === "configured" && options.manualMatches) {
-      // Geração configurada (com rodadas e partidas por time)
+      // Geração configurada (com rodadas e partidas por time) - NÃO GERA MATA-MATA AUTOMATICAMENTE
       console.log("⚙️ Gerando partidas com configurações personalizadas...");
       newMatches = this.generateManualMatches(options.manualMatches, teams);
+
+      // Adicionar partidas e retornar SEM processar lógica de fases
+      championship.matches = [...championship.matches, ...newMatches];
+      championship.status = "em_andamento";
+      await this.updateChampionship(championship);
+      console.log(`✅ ${newMatches.length} partidas configuradas adicionadas!`);
+      return;
     } else if (options?.type === "draw" && options.manualMatches) {
-      // Geração por sorteio manual
+      // Geração por sorteio manual - NÃO GERA MATA-MATA AUTOMATICAMENTE
       console.log("🎲 Gerando partidas por sorteio manual...");
       newMatches = this.generateManualMatches(options.manualMatches, teams);
+
+      // Adicionar partidas e retornar SEM processar lógica de fases
+      championship.matches = [...championship.matches, ...newMatches];
+      championship.status = "em_andamento";
+      await this.updateChampionship(championship);
+      console.log(`✅ ${newMatches.length} partidas sorteadas adicionadas!`);
+      return;
     } else if (championship.type === "pontos_corridos") {
       // Geração automática para pontos corridos (todos contra todos)
       console.log("🔄 Gerando partidas para pontos corridos...");
       newMatches = this.generateRoundRobinMatches(championship, options);
     } else if (championship.type === "grupos") {
-      // Geração automática para fase de grupos (chaveamento + grupos)
+      // Geração para fase de grupos (com grupos já definidos ou criação automática)
       console.log("🏆 Gerando partidas para fase de grupos...");
 
-      // Verificar se os grupos já foram criados
+      // Verificar se os grupos já foram criados (manuais ou automáticos)
       if (!championship.groups || championship.groups.length === 0) {
-        console.log("📋 Criando grupos com sorteio por chaveamento...");
+        console.log(
+          "📋 Criando grupos com sorteio automático por chaveamento..."
+        );
         const numberOfGroups = Math.min(4, Math.floor(teams.length / 2));
         championship.groups = this.createGroupsWithDraw(teams, numberOfGroups);
         championship.currentPhase = "grupos";
         console.log(
-          `✅ ${championship.groups.length} grupos criados por sorteio!`
+          `✅ ${championship.groups.length} grupos criados por sorteio automático!`
+        );
+      } else {
+        console.log(
+          `📋 Usando grupos já definidos (${championship.groups.length} grupos)`
         );
       }
 
@@ -982,8 +1009,17 @@ export class ChampionshipService {
           }
         }
       } else if (currentPhase === "mata_mata") {
-        console.log("⚔️ Gerando próxima fase do mata-mata...");
-        newMatches = this.generateNextKnockoutRound(championship);
+        console.log("⚔️ Gerando/avançando mata-mata (modo grupos)...");
+        const existingKnockout = (championship.matches || []).filter(
+          (m) => m.isKnockout || (m.id && m.id.startsWith("knockout_"))
+        );
+        if (existingKnockout.length === 0) {
+          // Ainda não gerou quartas: gerar a partir da classificação dos grupos
+          newMatches = this.generateKnockoutFromGroups(championship);
+        } else {
+          // Já existem partidas de mata-mata: avançar para a próxima fase (semifinais por sorteio, depois final)
+          newMatches = this.generateNextKnockoutRoundFromGroups(championship);
+        }
       }
     } else if (championship.type === "mata_mata") {
       // Geração automática para mata-mata (eliminação direta)
@@ -1610,6 +1646,27 @@ export class ChampionshipService {
     });
 
     return groups;
+  }
+
+  // Criar grupos manualmente (formação manual pelo usuário)
+  static createGroupsManually(manualGroups: Group[]): Group[] {
+    console.log("👥 Criando grupos com formação manual...");
+
+    // Validar grupos
+    manualGroups.forEach((group, index) => {
+      if (group.teamIds.length < 2) {
+        throw new Error(`${group.name} deve ter pelo menos 2 times`);
+      }
+      console.log(`${group.name}: ${group.teamIds.length} times`);
+    });
+
+    // Log final dos grupos
+    console.log("\n🏆 === GRUPOS MANUAIS FINALIZADOS ===");
+    manualGroups.forEach((group) => {
+      console.log(`${group.name}: ${group.teamIds.length} times`);
+    });
+
+    return manualGroups;
   }
 
   // Gerar partidas para mata-mata DINÂMICO (apenas primeira fase)
@@ -2569,7 +2626,7 @@ export class ChampionshipService {
     const matches: Match[] = [];
     let matchId = 0;
     const hasReturnMatches =
-      championship.groupStageSettings?.hasReturnMatches ?? true; // Padrão: ida e volta
+      championship.groupStageSettings?.hasReturnMatches ?? false; // Padrão: apenas ida
 
     console.log(
       `🏆 Gerando partidas da fase de grupos (${
@@ -2711,12 +2768,53 @@ export class ChampionshipService {
         return teamStats;
       });
 
-      // Ordenar por pontos, depois saldo de gols, depois gols pró
+      // Ordenar por critérios do regulamento:
+      // 1) pontos 2) vitórias 3) saldo 4) gols pró 5) menos gols sofridos
+      // 6) menos derrotas 7) menos vermelhos 8) menos amarelos 9) sorteio
       standings.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
+        if (b.wins !== a.wins) return b.wins - a.wins;
         if (b.goalDifference !== a.goalDifference)
           return b.goalDifference - a.goalDifference;
-        return b.goalsFor - a.goalsFor;
+        if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+
+        // Para gols sofridos e derrotas precisamos dos valores já computados no objeto
+        if (a.goalsAgainst !== b.goalsAgainst)
+          return a.goalsAgainst - b.goalsAgainst; // menos gols sofridos melhor
+        if (a.losses !== b.losses) return a.losses - b.losses; // menos derrotas melhor
+
+        // Cartões: somar cartões por time a partir dos artilheiros marcados nas partidas
+        const getTeamCards = (teamId: string) => {
+          let yellow = 0;
+          let red = 0;
+          (championship.matches || [])
+            .filter((m) => m.played)
+            .forEach((m) => {
+              const countCards = (scorers?: GoalScorer[]) => {
+                (scorers || []).forEach((s) => {
+                  if (s.yellowCard) yellow += 1;
+                  if (s.redCard) red += 1;
+                });
+              };
+              if (m.homeTeam === teamId) {
+                countCards(m.homeGoalScorers);
+              }
+              if (m.awayTeam === teamId) {
+                countCards(m.awayGoalScorers);
+              }
+            });
+          return { yellow, red };
+        };
+
+        const aCards = getTeamCards(a.teamId);
+        const bCards = getTeamCards(b.teamId);
+
+        if (aCards.red !== bCards.red) return aCards.red - bCards.red; // menos vermelhos
+        if (aCards.yellow !== bCards.yellow)
+          return aCards.yellow - bCards.yellow; // menos amarelos
+
+        // 9) Sorteio (ordem aleatória estável)
+        return Math.random() < 0.5 ? -1 : 1;
       });
 
       groupStandings[group.id] = {
@@ -2870,7 +2968,7 @@ export class ChampionshipService {
 
       // Calcular quantas partidas deveriam existir no grupo
       const hasReturnMatches =
-        championship.groupStageSettings?.hasReturnMatches ?? true;
+        championship.groupStageSettings?.hasReturnMatches ?? false;
       const expectedMatches = this.calculateExpectedGroupMatches(
         group.teamIds.length,
         hasReturnMatches
@@ -2907,47 +3005,61 @@ export class ChampionshipService {
       throw new Error("Não há grupos definidos para gerar o mata-mata");
     }
 
-    console.log("🏆 Obtendo classificados de cada grupo...");
+    console.log(
+      "🏆 Obtendo classificados (2 por grupo) e gerando quartas fixas..."
+    );
 
-    // Obter classificação dos grupos
     const groupStandings = this.getGroupStandings(championship);
-    const qualifiedTeams: string[] = [];
 
-    // Pegar APENAS o vencedor de cada grupo (1º colocado)
-    const teamsPerGroup = 1; // Apenas o campeão de cada grupo
+    // Mapear por letra do grupo (A, B, C, D)
+    const getGroupLetter = (name: string) => {
+      const match = name.match(/[A-D]/i);
+      return match ? match[0].toUpperCase() : name.toUpperCase();
+    };
+
+    const top2ByGroup: Record<string, string[]> = {};
 
     Object.values(groupStandings).forEach(({ standings, group }) => {
-      // Ordenar por pontos, depois por saldo de gols
-      const sortedStandings = standings.sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
-        return b.goalDifference - a.goalDifference;
-      });
-
-      // Pegar APENAS o 1º colocado (vencedor do grupo)
-      if (sortedStandings.length > 0) {
-        const winner = sortedStandings[0];
-        qualifiedTeams.push(winner.teamId);
-        console.log(
-          `🏆 Vencedor do ${group.name}: Time ${winner.teamId} (${winner.points} pts)`
-        );
-      }
+      // standings já vem ordenado com os critérios oficiais
+      const top2 = standings.slice(0, 2).map((s) => s.teamId);
+      top2ByGroup[getGroupLetter(group.name)] = top2;
     });
 
-    console.log(
-      `✅ ${qualifiedTeams.length} times classificados:`,
-      qualifiedTeams
-    );
+    // Cruzamento fixo das quartas
+    const pairs: Array<[string, string]> = [];
+    const a = top2ByGroup["A"] || [];
+    const b = top2ByGroup["B"] || [];
+    const c = top2ByGroup["C"] || [];
+    const d = top2ByGroup["D"] || [];
 
-    // Filtrar apenas os times classificados
-    const qualifiedTeamsData = championship.teams.filter((team) =>
-      qualifiedTeams.includes(team.id)
-    );
+    if (a.length >= 2 && b.length >= 2) {
+      pairs.push([a[0], b[1]]); // 1º A x 2º B
+      pairs.push([b[0], a[1]]); // 1º B x 2º A
+    }
+    if (c.length >= 2 && d.length >= 2) {
+      pairs.push([c[0], d[1]]); // 1º C x 2º D
+      pairs.push([d[0], c[1]]); // 1º D x 2º C
+    }
 
-    // Gerar partidas do mata-mata diretamente
-    return this.generateKnockoutMatchesFromTeams(
-      qualifiedTeamsData,
-      championship.id
-    );
+    const matches: Match[] = [];
+    let matchId = 0;
+    pairs.forEach(([home, away], idx) => {
+      matches.push({
+        id: `knockout_${championship.id}_qf_${Date.now()}_${matchId++}`,
+        homeTeam: home,
+        awayTeam: away,
+        played: false,
+        homeGoalScorers: [],
+        awayGoalScorers: [],
+        isKnockout: true,
+        knockoutRound: 1, // Quartas
+        round: 1,
+        matchOrder: idx + 1,
+      });
+    });
+
+    console.log(`✅ Quartas geradas: ${matches.length} partidas`);
+    return matches;
   }
 
   // Método específico para gerar mata-mata a partir de uma lista de times
@@ -3006,6 +3118,107 @@ export class ChampionshipService {
 
     console.log(`✅ ${matches.length} partidas de mata-mata geradas!`);
     return matches;
+  }
+
+  // Avança o mata-mata no modo "grupos":
+  // - Se só existem quartas e foram todas jogadas, sorteia semifinais
+  // - Se só existem semifinais e foram todas jogadas, gera final
+  static generateNextKnockoutRoundFromGroups(
+    championship: Championship
+  ): Match[] {
+    const all = championship.matches || [];
+    const ko = all.filter(
+      (m) => m.isKnockout || (m.id && m.id.includes("knockout_"))
+    );
+    if (ko.length === 0) return [];
+
+    // Detectar fase atual por knockoutRound: 1=quartas, 2=semifinais, 3=final
+    const maxRound = Math.max(...ko.map((m) => m.knockoutRound || 1));
+    const currentRoundMatches = ko.filter(
+      (m) => (m.knockoutRound || 1) === maxRound
+    );
+    const allPlayed = currentRoundMatches.every((m) => m.played);
+    if (!allPlayed) {
+      console.log("⏳ Ainda há jogos pendentes na rodada atual do mata-mata");
+      return [];
+    }
+
+    // Obter vencedores da fase atual
+    const winners: string[] = [];
+    let hasTie = false;
+    currentRoundMatches.forEach((m) => {
+      const hs = m.homeScore || 0;
+      const as = m.awayScore || 0;
+      if (hs > as) {
+        winners.push(m.homeTeam);
+      } else if (as > hs) {
+        winners.push(m.awayTeam);
+      } else {
+        // Documento não especifica critério de empate no mata‑mata
+        // Não decidir automaticamente: exigir resolução manual (pênaltis/sorteio externo)
+        console.log(
+          "⏸️ Empate no mata-mata detectado: aguardar definição manual do vencedor (pênaltis/sorteio externo). Partida:",
+          m.id
+        );
+        hasTie = true;
+      }
+    });
+
+    if (hasTie) {
+      console.log(
+        "⏳ Existindo empate(s) no mata-mata, a próxima fase não será gerada até que todos os vencedores sejam definidos."
+      );
+      return [];
+    }
+
+    const newMatches: Match[] = [];
+    let matchId = 0;
+
+    if (maxRound === 1) {
+      // Próxima fase: Semifinais por sorteio entre 4 classificados
+      const shuffled = [...winners].sort(() => Math.random() - 0.5);
+      for (let i = 0; i < shuffled.length; i += 2) {
+        if (i + 1 < shuffled.length) {
+          newMatches.push({
+            id: `knockout_${championship.id}_sf_${Date.now()}_${matchId++}`,
+            homeTeam: shuffled[i],
+            awayTeam: shuffled[i + 1],
+            played: false,
+            homeGoalScorers: [],
+            awayGoalScorers: [],
+            isKnockout: true,
+            knockoutRound: 2, // Semifinais
+            round: 2,
+            matchOrder: Math.floor(i / 2) + 1,
+          });
+        }
+      }
+      console.log(`✅ Semifinais sorteadas: ${newMatches.length} partidas`);
+      return newMatches;
+    }
+
+    if (maxRound === 2) {
+      // Próxima fase: Final entre os 2 vencedores
+      if (winners.length >= 2) {
+        newMatches.push({
+          id: `knockout_${championship.id}_fn_${Date.now()}_${matchId++}`,
+          homeTeam: winners[0],
+          awayTeam: winners[1],
+          played: false,
+          homeGoalScorers: [],
+          awayGoalScorers: [],
+          isKnockout: true,
+          knockoutRound: 3, // Final
+          round: 3,
+          matchOrder: 1,
+        });
+        console.log("🏆 Final gerada");
+      }
+      return newMatches;
+    }
+
+    console.log("✅ Mata-mata concluído ou sem próxima fase definida");
+    return [];
   }
 
   // Resetar sorteios (limpar grupos e partidas)

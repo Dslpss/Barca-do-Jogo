@@ -16,17 +16,20 @@ import {
   ConfiguredMatchOptions,
   ManualMatch,
   DrawOptions,
+  Group,
 } from "../types/championship";
 
 interface MatchGenerationConfigProps {
   visible: boolean;
   onClose: () => void;
   teams: Team[];
+  groups?: Group[];
   onGenerateMatches: (options: {
     type: "configured" | "draw";
     configuredOptions?: ConfiguredMatchOptions;
     drawOptions?: DrawOptions;
     manualMatches: ManualMatch[];
+    continueInModal?: boolean; // quando true, mantemos o modal aberto para avançar de grupo
   }) => void;
 }
 
@@ -34,6 +37,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
   visible,
   onClose,
   teams,
+  groups,
   onGenerateMatches,
 }) => {
   const [totalRounds, setTotalRounds] = useState<string>("2");
@@ -48,8 +52,22 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [generatedMatches, setGeneratedMatches] = useState<ManualMatch[]>([]);
   const [showDrawModal, setShowDrawModal] = useState(false);
+  const [selectedGroupIndex, setSelectedGroupIndex] = useState<number>(0);
+  // Estados para seleção manual de confrontos no Preview
+  const [selectedHomeTeamId, setSelectedHomeTeamId] = useState<string>("");
+  const [selectedAwayTeamId, setSelectedAwayTeamId] = useState<string>("");
+  const [manualRound, setManualRound] = useState<string>("1");
 
-  const maxPossibleMatches = teams.length > 1 ? teams.length - 1 : 0;
+  // Detectar se está trabalhando com grupos
+  const hasGroups = groups && groups.length > 0;
+
+  // Filtrar times do grupo selecionado se houver grupos
+  const activeTeams = hasGroups
+    ? teams.filter((t) => groups![selectedGroupIndex].teamIds.includes(t.id))
+    : teams;
+
+  const maxPossibleMatches =
+    activeTeams.length > 1 ? activeTeams.length - 1 : 0;
 
   const handlePreviewMatches = () => {
     console.log("🎯 handlePreviewMatches iniciado");
@@ -58,7 +76,9 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
       matchesPerTeam,
       totalGames,
       gameDistributionMode,
-      teamsCount: teams.length,
+      teamsCount: activeTeams.length,
+      hasGroups,
+      selectedGroup: hasGroups ? groups![selectedGroupIndex].name : "N/A",
     });
 
     const rounds = parseInt(totalRounds);
@@ -82,13 +102,13 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
 
       // Calcular partidas por time baseado no total de jogos
       // Cada jogo envolve 2 times, então: totalGames * 2 = soma de todas as partidas dos times
-      matchesPerTeamNum = Math.floor((totalGamesNum * 2) / teams.length);
+      matchesPerTeamNum = Math.floor((totalGamesNum * 2) / activeTeams.length);
       console.log("🔢 Calculado matchesPerTeamNum:", matchesPerTeamNum);
 
       if (matchesPerTeamNum < 1) {
         Alert.alert(
           "Erro",
-          `Com ${totalGamesNum} jogos e ${teams.length} times, cada time jogaria menos de 1 partida. Aumente o número de jogos.`
+          `Com ${totalGamesNum} jogos e ${activeTeams.length} times, cada time jogaria menos de 1 partida. Aumente o número de jogos.`
         );
         return;
       }
@@ -112,17 +132,18 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
       }
 
       // Calcular total de jogos baseado nas partidas por time
-      totalGamesNum = Math.floor((matchesPerTeamNum * teams.length) / 2);
+      totalGamesNum = Math.floor((matchesPerTeamNum * activeTeams.length) / 2);
       console.log("🔢 Calculado totalGamesNum:", totalGamesNum);
     }
 
     // Validações matemáticas
-    const teamIds = teams.map((team) => team.id);
-    const maxPossibleGames = (teams.length * (teams.length - 1)) / 2;
-    const maxSimultaneousGames = Math.floor(teams.length / 2);
+    const teamIds = activeTeams.map((team) => team.id);
+    const maxPossibleGames =
+      (activeTeams.length * (activeTeams.length - 1)) / 2;
+    const maxSimultaneousGames = Math.floor(activeTeams.length / 2);
 
     console.log("🏗️ Validações:", {
-      teamsCount: teams.length,
+      teamsCount: activeTeams.length,
       maxPossibleGames,
       maxSimultaneousGames,
       requestedGames:
@@ -134,7 +155,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
     if (gameDistributionMode === "manual" && totalGamesNum > maxPossibleGames) {
       Alert.alert(
         "Erro",
-        `Impossível gerar ${totalGamesNum} jogos únicos com ${teams.length} times.\nMáximo possível: ${maxPossibleGames} jogos únicos.\n\nSugestão: Use jogos de ida e volta ou reduza o número de jogos.`
+        `Impossível gerar ${totalGamesNum} jogos únicos com ${activeTeams.length} times.\nMáximo possível: ${maxPossibleGames} jogos únicos.\n\nSugestão: Use jogos de ida e volta ou reduza o número de jogos.`
       );
       return;
     }
@@ -143,7 +164,10 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
     const targetGamesNum =
       gameDistributionMode === "manual"
         ? totalGamesNum
-        : Math.min((matchesPerTeamNum * teams.length) / 2, maxPossibleGames);
+        : Math.min(
+            (matchesPerTeamNum * activeTeams.length) / 2,
+            maxPossibleGames
+          );
     const gamesPerRound = Math.ceil(targetGamesNum / rounds);
 
     // Validar se há jogos suficientes para o número de rodadas
@@ -159,7 +183,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
       Alert.alert(
         "Erro",
         `Com ${
-          teams.length
+          activeTeams.length
         } times, máximo ${maxSimultaneousGames} jogos simultâneos por rodada.\nVocê precisa de ${gamesPerRound} jogos por rodada.\n\nSugestão: Aumente o número de rodadas para ${Math.ceil(
           targetGamesNum / maxSimultaneousGames
         )} ou mais.`
@@ -295,7 +319,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
       totalRounds: parseInt(totalRounds),
       matchesPerTeam:
         gameDistributionMode === "manual"
-          ? Math.floor((parseInt(totalGames) * 2) / teams.length)
+          ? Math.floor((parseInt(totalGames) * 2) / activeTeams.length)
           : parseInt(matchesPerTeam),
       matchDistribution: "equal",
       totalGames:
@@ -308,9 +332,49 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
       type: "configured",
       configuredOptions,
       manualMatches: generatedMatches,
+      continueInModal: false,
     });
 
     onClose();
+  };
+
+  const handleConfirmAndNextGroup = () => {
+    // Só habilitar em contexto de grupos e se existir próximo grupo
+    if (!hasGroups || !groups || selectedGroupIndex >= groups.length - 1)
+      return;
+
+    const configuredOptions: ConfiguredMatchOptions = {
+      totalRounds: parseInt(totalRounds),
+      matchesPerTeam:
+        gameDistributionMode === "manual"
+          ? Math.floor((parseInt(totalGames) * 2) / activeTeams.length)
+          : parseInt(matchesPerTeam),
+      matchDistribution: "equal",
+      totalGames:
+        gameDistributionMode === "manual" ? parseInt(totalGames) : undefined,
+      gameDistributionMode,
+      generationMode,
+    };
+
+    onGenerateMatches({
+      type: "configured",
+      configuredOptions,
+      manualMatches: generatedMatches,
+      continueInModal: true,
+    });
+
+    // Preparar para próximo grupo sem fechar o modal
+    setShowPreview(false);
+    setGeneratedMatches([]);
+    setSelectedGroupIndex((prev) => Math.min(prev + 1, groups.length - 1));
+    Alert.alert(
+      "Próximo Grupo",
+      `Partidas confirmadas para ${
+        groups[selectedGroupIndex].name
+      }. Agora configure ${
+        groups[Math.min(selectedGroupIndex + 1, groups.length - 1)].name
+      }.`
+    );
   };
 
   const handleDrawMatches = (options: {
@@ -364,12 +428,148 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                 {gameDistributionMode === "manual" && totalGames && (
                   <Text style={styles.previewSummary}>
                     🎯 Configuração: {parseInt(totalGames)} jogos totais
-                    distribuídos entre {teams.length} times
+                    distribuídos entre {activeTeams.length} times
                   </Text>
                 )}
                 <Text style={styles.debugText}>
-                  🔍 Debug: Modal funcionando - {teams.length} times cadastrados
+                  🔍 Debug: Modal funcionando - {activeTeams.length} times no
+                  contexto atual
                 </Text>
+              </View>
+
+              {/* Bloco para adicionar confronto manual */}
+              <View style={styles.manualSelectContainer}>
+                <Text style={styles.manualSelectTitle}>
+                  Adicionar confronto manual
+                </Text>
+                <Text style={styles.manualSelectHint}>
+                  Selecione dois times do{" "}
+                  {hasGroups
+                    ? groups![selectedGroupIndex].name
+                    : "conjunto atual"}{" "}
+                  para adicionar ao calendário.
+                </Text>
+                <Text style={styles.manualSelectLabel}>Time da casa</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.teamChipsScroll}
+                >
+                  {activeTeams.map((t) => (
+                    <TouchableOpacity
+                      key={`home-${t.id}`}
+                      style={[
+                        styles.teamChip,
+                        selectedHomeTeamId === t.id && styles.teamChipSelected,
+                      ]}
+                      onPress={() => setSelectedHomeTeamId(t.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.teamChipText,
+                          selectedHomeTeamId === t.id &&
+                            styles.teamChipTextSelected,
+                        ]}
+                      >
+                        {t.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <Text style={[styles.manualSelectLabel, { marginTop: 10 }]}>
+                  Time visitante
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.teamChipsScroll}
+                >
+                  {activeTeams.map((t) => (
+                    <TouchableOpacity
+                      key={`away-${t.id}`}
+                      style={[
+                        styles.teamChip,
+                        selectedAwayTeamId === t.id && styles.teamChipSelected,
+                      ]}
+                      onPress={() => setSelectedAwayTeamId(t.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.teamChipText,
+                          selectedAwayTeamId === t.id &&
+                            styles.teamChipTextSelected,
+                        ]}
+                      >
+                        {t.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={styles.roundInlineRow}>
+                  <Text style={styles.manualSelectLabel}>Rodada</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { flex: 0, width: 80, marginLeft: 10 },
+                    ]}
+                    value={manualRound}
+                    onChangeText={setManualRound}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      styles.primaryButton,
+                      { marginLeft: 10, flex: 0 },
+                    ]}
+                    onPress={() => {
+                      const roundNum = parseInt(manualRound || "1");
+                      if (!selectedHomeTeamId || !selectedAwayTeamId) {
+                        Alert.alert("Erro", "Selecione os dois times");
+                        return;
+                      }
+                      if (selectedHomeTeamId === selectedAwayTeamId) {
+                        Alert.alert(
+                          "Erro",
+                          "Um time não pode jogar contra ele mesmo"
+                        );
+                        return;
+                      }
+                      if (!roundNum || roundNum < 1) {
+                        Alert.alert("Erro", "Informe uma rodada válida (>= 1)");
+                        return;
+                      }
+                      const exists = generatedMatches.some(
+                        (m) =>
+                          (m.homeTeamId === selectedHomeTeamId &&
+                            m.awayTeamId === selectedAwayTeamId &&
+                            (m.round || 1) === roundNum) ||
+                          (m.homeTeamId === selectedAwayTeamId &&
+                            m.awayTeamId === selectedHomeTeamId &&
+                            (m.round || 1) === roundNum)
+                      );
+                      if (exists) {
+                        Alert.alert(
+                          "Erro",
+                          "Este confronto já foi adicionado para essa rodada"
+                        );
+                        return;
+                      }
+                      setGeneratedMatches((prev) => [
+                        ...prev,
+                        {
+                          homeTeamId: selectedHomeTeamId,
+                          awayTeamId: selectedAwayTeamId,
+                          round: roundNum,
+                        },
+                      ]);
+                      // manter seleção para facilitar múltiplas adições
+                    }}
+                  >
+                    <Text style={styles.primaryButtonText}>Adicionar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {generatedMatches.length === 0 ? (
@@ -393,11 +593,43 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                         <View key={round} style={styles.roundContainer}>
                           <Text style={styles.roundTitle}>Rodada {round}</Text>
                           {roundMatches.map((match, index) => (
-                            <View key={index} style={styles.matchItem}>
-                              <Text style={styles.matchText}>
-                                {getTeamName(match.homeTeamId)} vs{" "}
-                                {getTeamName(match.awayTeamId)}
-                              </Text>
+                            <View
+                              key={`${match.homeTeamId}-${match.awayTeamId}-${index}`}
+                              style={styles.matchItem}
+                            >
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Text style={styles.matchText}>
+                                  {getTeamName(match.homeTeamId)} vs{" "}
+                                  {getTeamName(match.awayTeamId)}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setGeneratedMatches((prev) => {
+                                      const idx = prev.findIndex(
+                                        (m) =>
+                                          m.homeTeamId === match.homeTeamId &&
+                                          m.awayTeamId === match.awayTeamId &&
+                                          (m.round || 1) === (match.round || 1)
+                                      );
+                                      if (idx >= 0) {
+                                        const copy = [...prev];
+                                        copy.splice(idx, 1);
+                                        return copy;
+                                      }
+                                      return prev;
+                                    });
+                                  }}
+                                  style={styles.removeChip}
+                                >
+                                  <Text style={styles.removeChipText}>×</Text>
+                                </TouchableOpacity>
+                              </View>
                             </View>
                           ))}
                         </View>
@@ -416,6 +648,19 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                 >
                   <Text style={styles.secondaryButtonText}>Voltar</Text>
                 </TouchableOpacity>
+                {hasGroups &&
+                  groups &&
+                  selectedGroupIndex < groups.length - 1 && (
+                    <TouchableOpacity
+                      style={[styles.button, styles.primaryButton]}
+                      onPress={handleConfirmAndNextGroup}
+                      disabled={generatedMatches.length === 0}
+                    >
+                      <Text style={styles.primaryButtonText}>
+                        Confirmar e avançar
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 <TouchableOpacity
                   style={[styles.button, styles.primaryButton]}
                   onPress={handleConfirmGeneration}
@@ -449,42 +694,96 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
+            {/* Seção de Seleção de Grupo (se houver grupos) */}
+            {hasGroups && (
+              <View style={styles.groupSelectorContainer}>
+                <Text style={styles.groupSelectorTitle}>
+                  🏟️ Configurar Confrontos por Grupo
+                </Text>
+                <Text style={styles.groupSelectorSubtitle}>
+                  Selecione um grupo para configurar seus confrontos:
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.groupButtonsScroll}
+                >
+                  {groups!.map((group, index) => {
+                    const groupTeams = teams.filter((t) =>
+                      group.teamIds.includes(t.id)
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={group.id}
+                        style={[
+                          styles.groupButton,
+                          selectedGroupIndex === index &&
+                            styles.groupButtonSelected,
+                        ]}
+                        onPress={() => setSelectedGroupIndex(index)}
+                      >
+                        <Text
+                          style={[
+                            styles.groupButtonText,
+                            selectedGroupIndex === index &&
+                              styles.groupButtonTextSelected,
+                          ]}
+                        >
+                          {group.name}
+                        </Text>
+                        <Text style={styles.groupButtonTeamCount}>
+                          {groupTeams.length} times
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
             <View style={styles.infoContainer}>
               <Text style={styles.infoText}>
-                🏆 Times cadastrados: {teams.length}
+                🏆 Times{" "}
+                {hasGroups
+                  ? `no ${groups![selectedGroupIndex].name}`
+                  : "cadastrados"}
+                : {activeTeams.length}
               </Text>
               <Text style={styles.infoText}>
                 ⚽ Máximo de partidas por time: {maxPossibleMatches}
               </Text>
               <Text style={styles.infoText}>
-                🎯 Máximo de jogos simultâneos: {Math.floor(teams.length / 2)}
+                🎯 Máximo de jogos simultâneos:{" "}
+                {Math.floor(activeTeams.length / 2)}
               </Text>
             </View>
 
             {/* Seção de Sugestões Inteligentes */}
-            {teams.length >= 2 && (
+            {activeTeams.length >= 2 && (
               <View style={styles.smartSuggestionsContainer}>
                 <Text style={styles.smartSuggestionsTitle}>
                   🧠 Sugestões Inteligentes
                 </Text>
-                
+
                 {(() => {
-                  const maxSimultaneousGames = Math.floor(teams.length / 2);
+                  const maxSimultaneousGames = Math.floor(
+                    activeTeams.length / 2
+                  );
                   const totalPossibleGames =
-                    (teams.length * (teams.length - 1)) / 2;
-                  
+                    (activeTeams.length * (activeTeams.length - 1)) / 2;
+
                   // Sugestões baseadas no número de times
                   const suggestions = {
                     conservative: {
-                      games: Math.ceil(teams.length * 0.6), // 60% dos times como adversários
+                      games: Math.ceil(activeTeams.length * 0.6), // 60% dos times como adversários
                       rounds: Math.ceil(
-                        (teams.length * 0.6) / maxSimultaneousGames
+                        (activeTeams.length * 0.6) / maxSimultaneousGames
                       ),
                     },
                     balanced: {
-                      games: Math.ceil(teams.length * 0.8), // 80% dos times como adversários
+                      games: Math.ceil(activeTeams.length * 0.8), // 80% dos times como adversários
                       rounds: Math.ceil(
-                        (teams.length * 0.8) / maxSimultaneousGames
+                        (activeTeams.length * 0.8) / maxSimultaneousGames
                       ),
                     },
                     complete: {
@@ -494,10 +793,10 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                       ),
                     },
                   };
-                  
+
                   return (
                     <View style={styles.suggestionsGrid}>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.suggestionCard}
                         onPress={() => {
                           setTotalGames(
@@ -521,8 +820,8 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                           Campeonato rápido
                         </Text>
                       </TouchableOpacity>
-                      
-                      <TouchableOpacity 
+
+                      <TouchableOpacity
                         style={styles.suggestionCard}
                         onPress={() => {
                           setTotalGames(suggestions.balanced.games.toString());
@@ -544,8 +843,8 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                           Recomendado
                         </Text>
                       </TouchableOpacity>
-                      
-                      <TouchableOpacity 
+
+                      <TouchableOpacity
                         style={styles.suggestionCard}
                         onPress={() => {
                           setTotalGames(suggestions.complete.games.toString());
@@ -613,7 +912,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                   </Text>
                 </TouchableOpacity>
               </View>
-              
+
               {/* Explicações detalhadas sobre cada modo */}
               <View style={styles.explanationContainer}>
                 {gameDistributionMode === "auto" ? (
@@ -684,7 +983,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                   </Text>
                 </TouchableOpacity>
               </View>
-              
+
               {/* Explicações detalhadas sobre cada modo de geração */}
               <View style={styles.explanationContainer}>
                 {generationMode === "dynamic" ? (
@@ -737,16 +1036,19 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
                 const targetGamesNum =
                   gameDistributionMode === "auto"
                     ? Math.floor(
-                        (parseInt(matchesPerTeam || "0") * teams.length) / 2
+                        (parseInt(matchesPerTeam || "0") * activeTeams.length) /
+                          2
                       )
-                  : parseInt(totalGames || "0");
-                
+                    : parseInt(totalGames || "0");
+
                 if (targetGamesNum > 0) {
-                  const maxSimultaneousGames = Math.floor(teams.length / 2);
+                  const maxSimultaneousGames = Math.floor(
+                    activeTeams.length / 2
+                  );
                   const suggestedRounds = Math.ceil(
                     targetGamesNum / maxSimultaneousGames
                   );
-                  
+
                   return (
                     <Text style={styles.suggestionHint}>
                       💡 Sugestão: {suggestedRounds} rodada
@@ -829,7 +1131,7 @@ const MatchGenerationConfig: React.FC<MatchGenerationConfigProps> = ({
       <ManualDrawModal
         visible={showDrawModal}
         onClose={() => setShowDrawModal(false)}
-        teams={teams}
+        teams={activeTeams}
         onGenerateMatches={handleDrawMatches}
       />
     </Modal>
@@ -888,6 +1190,56 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     marginBottom: 20,
+  },
+  groupSelectorContainer: {
+    backgroundColor: theme.colors.card,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+  },
+  groupSelectorTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  groupSelectorSubtitle: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginBottom: 12,
+  },
+  groupButtonsScroll: {
+    flexDirection: "row",
+  },
+  groupButton: {
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginRight: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    minWidth: 100,
+    alignItems: "center",
+  },
+  groupButtonSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  groupButtonText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginBottom: 4,
+  },
+  groupButtonTextSelected: {
+    color: "#fff",
+  },
+  groupButtonTeamCount: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
   },
   infoText: {
     fontSize: 14,
@@ -1006,6 +1358,73 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+  },
+  manualSelectContainer: {
+    backgroundColor: theme.colors.background,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  manualSelectTitle: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginBottom: 6,
+  },
+  manualSelectHint: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginBottom: 10,
+  },
+  manualSelectLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginBottom: 6,
+  },
+  teamChipsScroll: {
+    marginBottom: 6,
+  },
+  teamChip: {
+    backgroundColor: "white",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginRight: 8,
+  },
+  teamChipSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  teamChipText: {
+    fontSize: 12,
+    color: theme.colors.text,
+  },
+  teamChipTextSelected: {
+    color: "#fff",
+  },
+  roundInlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  removeChip: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removeChipText: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: "bold",
+    lineHeight: 20,
   },
   modeSelector: {
     flexDirection: "row",

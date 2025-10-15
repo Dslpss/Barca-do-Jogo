@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "jsx": "react",
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["scripts/**/*.ts", "src/utils/e2eLogic.ts", "src/types/**/*.ts"]
+}

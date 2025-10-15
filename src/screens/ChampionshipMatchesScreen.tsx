@@ -15,6 +15,7 @@ import { useIsFocused } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import MatchGenerationConfig from "../components/MatchGenerationConfig";
 import ManualDrawModal from "../components/ManualDrawModal";
+import ManualGroupsModal from "../components/ManualGroupsModal";
 import { theme } from "../theme/theme";
 import { useChampionship } from "../hooks/useChampionship";
 import { ChampionshipService } from "../services/championshipService";
@@ -66,7 +67,9 @@ const ChampionshipMatchesScreen = () => {
   const [showConfiguredGenerationModal, setShowConfiguredGenerationModal] =
     useState(false);
   const [showDrawModal, setShowDrawModal] = useState(false);
+  const [showManualGroupsModal, setShowManualGroupsModal] = useState(false);
   const [showQuickManualModal, setShowQuickManualModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [showTeamSelector, setShowTeamSelector] = useState<
     "home" | "away" | null
   >(null);
@@ -109,6 +112,7 @@ const ChampionshipMatchesScreen = () => {
     const teamsCount = currentChampionship.teams?.length || 0;
 
     console.log(`🏆 Tipo de campeonato detectado: ${championshipType}`);
+    console.log(`🏆 Campeonato completo:`, currentChampionship);
 
     // ADAPTAR OPÇÕES BASEADO NO TIPO DE CAMPEONATO
     switch (championshipType) {
@@ -121,74 +125,100 @@ const ChampionshipMatchesScreen = () => {
             { text: "Cancelar", style: "cancel" },
             {
               text: "⚙️ Configurar Manualmente",
-              onPress: () => setShowConfiguredGenerationModal(true),
+              onPress: async () => {
+                try {
+                  await forceReloadCurrentChampionship();
+                } catch (_) {}
+                setShowConfiguredGenerationModal(true);
+              },
             },
           ]
         );
         break;
 
       case "grupos":
-        // FASE DE GRUPOS: Sorteio dos grupos + confrontos internos
+        // FASE DE GRUPOS: Opção entre sorteio automático ou formação manual
         Alert.alert(
           "🏆 Fase de Grupos",
-          `Campeonato de grupos com ${teamsCount} times.\n\nOs times serão sorteados em grupos e jogarão entre si.\n\nEscolha o formato das partidas:`,
+          `Campeonato de grupos com ${teamsCount} times.\n\nComo deseja formar os grupos?`,
           [
             { text: "Cancelar", style: "cancel" },
             {
-              text: "🔄 Ida e Volta",
-              onPress: async () => {
-                try {
-                  console.log("🏆 Gerando fase de grupos com ida e volta...");
+              text: "🎲 Sorteio Automático",
+              onPress: () => {
+                // Mostrar opções de partidas após sorteio automático
+                Alert.alert(
+                  "🎲 Sorteio Automático",
+                  "Os times serão sorteados automaticamente em grupos.\n\nEscolha o formato das partidas:",
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    {
+                      text: "🔄 Ida e Volta",
+                      onPress: async () => {
+                        try {
+                          console.log(
+                            "🏆 Gerando fase de grupos com ida e volta (sorteio automático)..."
+                          );
 
-                  // Configurar ida e volta
-                  if (currentChampionship) {
-                    currentChampionship.groupStageSettings = {
-                      hasReturnMatches: true,
-                    };
-                    await updateChampionship(currentChampionship);
-                  }
+                          // Configurar ida e volta
+                          if (currentChampionship) {
+                            currentChampionship.groupStageSettings = {
+                              hasReturnMatches: true,
+                            };
+                            await updateChampionship(currentChampionship);
+                          }
 
-                  await generateMatches(); // Automático para grupos
-                  Alert.alert(
-                    "Sucesso",
-                    "Grupos sorteados e partidas de ida e volta geradas!"
-                  );
-                } catch (error) {
-                  console.error("Erro ao gerar grupos:", error);
-                  Alert.alert(
-                    "Erro",
-                    "Erro ao gerar partidas. Tente novamente."
-                  );
-                }
+                          await generateMatches(); // Automático para grupos
+                          Alert.alert(
+                            "Sucesso",
+                            "Grupos sorteados automaticamente e partidas de ida e volta geradas!"
+                          );
+                        } catch (error) {
+                          console.error("Erro ao gerar grupos:", error);
+                          Alert.alert(
+                            "Erro",
+                            "Erro ao gerar partidas. Tente novamente."
+                          );
+                        }
+                      },
+                    },
+                    {
+                      text: "➡️ Apenas Ida",
+                      onPress: async () => {
+                        try {
+                          console.log(
+                            "🏆 Gerando fase de grupos apenas ida (sorteio automático)..."
+                          );
+
+                          // Configurar apenas ida
+                          if (currentChampionship) {
+                            currentChampionship.groupStageSettings = {
+                              hasReturnMatches: false,
+                            };
+                            await updateChampionship(currentChampionship);
+                          }
+
+                          await generateMatches(); // Automático para grupos
+                          Alert.alert(
+                            "Sucesso",
+                            "Grupos sorteados automaticamente e partidas de ida geradas!"
+                          );
+                        } catch (error) {
+                          console.error("Erro ao gerar grupos:", error);
+                          Alert.alert(
+                            "Erro",
+                            "Erro ao gerar partidas. Tente novamente."
+                          );
+                        }
+                      },
+                    },
+                  ]
+                );
               },
             },
             {
-              text: "➡️ Apenas Ida",
-              onPress: async () => {
-                try {
-                  console.log("🏆 Gerando fase de grupos apenas ida...");
-
-                  // Configurar apenas ida
-                  if (currentChampionship) {
-                    currentChampionship.groupStageSettings = {
-                      hasReturnMatches: false,
-                    };
-                    await updateChampionship(currentChampionship);
-                  }
-
-                  await generateMatches(); // Automático para grupos
-                  Alert.alert(
-                    "Sucesso",
-                    "Grupos sorteados e partidas de ida geradas!"
-                  );
-                } catch (error) {
-                  console.error("Erro ao gerar grupos:", error);
-                  Alert.alert(
-                    "Erro",
-                    "Erro ao gerar partidas. Tente novamente."
-                  );
-                }
-              },
+              text: "👥 Formação Manual",
+              onPress: () => setShowManualGroupsModal(true),
             },
           ]
         );
@@ -291,7 +321,12 @@ const ChampionshipMatchesScreen = () => {
             { text: "Cancelar", style: "cancel" },
             {
               text: "Configurar",
-              onPress: () => setShowConfiguredGenerationModal(true),
+              onPress: async () => {
+                try {
+                  await forceReloadCurrentChampionship();
+                } catch (_) {}
+                setShowConfiguredGenerationModal(true);
+              },
             },
             {
               text: "Seleção Manual",
@@ -345,6 +380,38 @@ const ChampionshipMatchesScreen = () => {
     }
   };
 
+  // Helper: Atualizar configuração de ida/volta da fase de grupos
+  const setGroupReturnMatches = async (value: boolean) => {
+    if (!currentChampionship) return;
+
+    try {
+      const hasGroupMatches = (currentChampionship.matches || []).some((m) =>
+        (currentChampionship.groups || []).some(
+          (g) =>
+            g.teamIds.includes(m.homeTeam) && g.teamIds.includes(m.awayTeam)
+        )
+      );
+
+      if (hasGroupMatches) {
+        Alert.alert(
+          "Indisponível",
+          "Não é possível alterar o formato após gerar partidas da fase de grupos."
+        );
+        return;
+      }
+
+      const updated: Championship = {
+        ...currentChampionship,
+        groupStageSettings: { hasReturnMatches: value },
+      };
+      await updateChampionship(updated);
+      await forceReloadCurrentChampionship();
+    } catch (e) {
+      console.error("Erro ao atualizar formato da fase de grupos:", e);
+      Alert.alert("Erro", "Não foi possível salvar a configuração.");
+    }
+  };
+
   const handleConfirmGeneration = async () => {
     if (!currentChampionship) return;
 
@@ -373,6 +440,7 @@ const ChampionshipMatchesScreen = () => {
     configuredOptions?: ConfiguredMatchOptions;
     drawOptions?: any;
     manualMatches: ManualMatch[];
+    continueInModal?: boolean;
   }) => {
     if (!currentChampionship) return;
 
@@ -384,11 +452,15 @@ const ChampionshipMatchesScreen = () => {
       };
 
       await generateMatches(generationOptions);
-      setShowConfiguredGenerationModal(false);
-      Alert.alert(
-        "Sucesso",
-        `${options.manualMatches.length} partidas geradas com configuração personalizada!`
-      );
+
+      // Se for fluxo sequencial (Confirmar e avançar), mantemos o modal aberto
+      if (!options.continueInModal) {
+        setShowConfiguredGenerationModal(false);
+        Alert.alert(
+          "Sucesso",
+          `${options.manualMatches.length} partidas geradas com configuração personalizada!`
+        );
+      }
     } catch (error) {
       console.error("Erro ao gerar partidas configuradas:", error);
       Alert.alert("Erro", "Erro ao gerar partidas. Tente novamente.");
@@ -418,6 +490,120 @@ const ChampionshipMatchesScreen = () => {
     } catch (error) {
       console.error("Erro ao sortear partidas:", error);
       Alert.alert("Erro", "Erro ao sortear partidas. Tente novamente.");
+    }
+  };
+
+  const handleManualGroupsCreation = async (manualGroups: Group[]) => {
+    if (!currentChampionship) return;
+
+    try {
+      console.log("👥 Criando grupos manuais...", manualGroups);
+
+      // Atualizar o campeonato com os grupos criados manualmente
+      const updatedChampionship: Championship = {
+        ...currentChampionship,
+        groups: ChampionshipService.createGroupsManually(manualGroups),
+        currentPhase: "grupos" as const,
+      };
+
+      await updateChampionship(updatedChampionship);
+
+      // Android só exibe até 3 botões no Alert.
+      // Fluxo em 2 etapas: 1) escolher Manual x Automático; 2) se Automático, escolher Ida/Volta.
+      Alert.alert(
+        "✅ Grupos Criados!",
+        "Grupos formados com sucesso!\n\nComo deseja configurar as partidas?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "⚙️ Configuração Manual",
+            onPress: async () => {
+              try {
+                console.log(
+                  "🏆 Abrindo configuração manual de confrontos para grupos..."
+                );
+                // Salvar grupos e garantir que o estado local seja recarregado
+                await updateChampionship(updatedChampionship);
+                // Recarrega do backend para refletir os grupos imediatamente no modal
+                await forceReloadCurrentChampionship();
+                setShowConfiguredGenerationModal(true);
+              } catch (error) {
+                console.error("Erro ao salvar grupos:", error);
+                Alert.alert("Erro", "Erro ao salvar grupos. Tente novamente.");
+              }
+            },
+          },
+          {
+            text: "⚡️ Gerar Automático",
+            onPress: () => {
+              Alert.alert(
+                "⚙️ Formato das Partidas",
+                "Escolha o formato para geração automática:",
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  {
+                    text: "🔄 Ida e Volta",
+                    onPress: async () => {
+                      try {
+                        console.log(
+                          "🏆 Gerando partidas da fase de grupos (ida e volta - grupos manuais)..."
+                        );
+                        const finalChampionship: Championship = {
+                          ...updatedChampionship,
+                          groupStageSettings: { hasReturnMatches: true },
+                        };
+                        await updateChampionship(finalChampionship);
+                        await generateMatches();
+                        Alert.alert(
+                          "Sucesso",
+                          "Grupos criados manualmente e partidas de ida e volta geradas!"
+                        );
+                      } catch (error) {
+                        console.error("Erro ao gerar partidas:", error);
+                        Alert.alert(
+                          "Erro",
+                          "Erro ao gerar partidas. Tente novamente."
+                        );
+                      }
+                    },
+                  },
+                  {
+                    text: "➡️ Apenas Ida",
+                    onPress: async () => {
+                      try {
+                        console.log(
+                          "🏆 Gerando partidas da fase de grupos (apenas ida - grupos manuais)..."
+                        );
+                        const finalChampionship: Championship = {
+                          ...updatedChampionship,
+                          groupStageSettings: { hasReturnMatches: false },
+                        };
+                        await updateChampionship(finalChampionship);
+                        await generateMatches();
+                        Alert.alert(
+                          "Sucesso",
+                          "Grupos criados manualmente e partidas de ida geradas!"
+                        );
+                      } catch (error) {
+                        console.error("Erro ao gerar partidas:", error);
+                        Alert.alert(
+                          "Erro",
+                          "Erro ao gerar partidas. Tente novamente."
+                        );
+                      }
+                    },
+                  },
+                ]
+              );
+            },
+          },
+        ]
+      );
+
+      setShowManualGroupsModal(false);
+    } catch (error) {
+      console.error("Erro ao criar grupos manuais:", error);
+      Alert.alert("Erro", "Erro ao criar grupos. Tente novamente.");
     }
   };
 
@@ -1435,24 +1621,25 @@ const ChampionshipMatchesScreen = () => {
             </Text>
             <View style={styles.buttonRow}>
               <TouchableOpacity
-                style={[styles.generateButton, styles.buttonThird]}
+                style={[styles.generateButton, styles.buttonHalf]}
                 onPress={handleGenerateMatches}
               >
                 <Text style={styles.generateButtonText}>Gerar Partidas</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.drawButton, styles.buttonThird]}
+                style={[styles.drawButton, styles.buttonHalf]}
                 onPress={() => setShowDrawModal(true)}
               >
                 <Text style={styles.drawButtonText}>🎲 Sortear</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.manualButton, styles.buttonThird]}
-                onPress={handleQuickManualMatch}
-              >
-                <Text style={styles.manualButtonText}>⚽ Manual</Text>
-              </TouchableOpacity>
             </View>
+            {/* Botão de Ajuda */}
+            <TouchableOpacity
+              style={styles.helpButtonCentered}
+              onPress={() => setShowHelpModal(true)}
+            >
+              <Text style={styles.helpButtonText}>❓ Ajuda</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -1480,6 +1667,146 @@ const ChampionshipMatchesScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Toggle de formato da fase de grupos (apenas ida vs ida e volta) */}
+            {currentChampionship.type === "grupos" && (
+              <View style={styles.groupFormatContainer}>
+                <Text style={styles.groupFormatLabel}>
+                  Formato (fase de grupos):
+                </Text>
+                <View style={styles.groupFormatChips}>
+                  {(() => {
+                    const current =
+                      !!currentChampionship.groupStageSettings
+                        ?.hasReturnMatches;
+                    const hasGroupMatches = (
+                      currentChampionship.matches || []
+                    ).some((m) =>
+                      (currentChampionship.groups || []).some(
+                        (g) =>
+                          g.teamIds.includes(m.homeTeam) &&
+                          g.teamIds.includes(m.awayTeam)
+                      )
+                    );
+                    return (
+                      <>
+                        <TouchableOpacity
+                          disabled={hasGroupMatches}
+                          onPress={() => setGroupReturnMatches(false)}
+                          style={[
+                            styles.groupFormatChip,
+                            !current && styles.groupFormatChipActive,
+                            hasGroupMatches && styles.groupFormatChipDisabled,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.groupFormatChipText,
+                              !current && styles.groupFormatChipTextActive,
+                            ]}
+                          >
+                            ➡️ Apenas Ida
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          disabled={hasGroupMatches}
+                          onPress={() => setGroupReturnMatches(true)}
+                          style={[
+                            styles.groupFormatChip,
+                            current && styles.groupFormatChipActive,
+                            hasGroupMatches && styles.groupFormatChipDisabled,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.groupFormatChipText,
+                              current && styles.groupFormatChipTextActive,
+                            ]}
+                          >
+                            🔄 Ida e Volta
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  })()}
+                </View>
+              </View>
+            )}
+
+            {/* Botão para gerar Mata-Mata após fase de grupos completa */}
+            {currentChampionship.type === "grupos" &&
+              currentChampionship.currentPhase === "grupos" &&
+              currentChampionship.groups &&
+              currentChampionship.groups.length > 0 &&
+              (() => {
+                // Verificar se todas as partidas da fase de grupos foram jogadas
+                const groupMatches = currentChampionship.matches.filter(
+                  (match) => {
+                    return currentChampionship.groups!.some(
+                      (group) =>
+                        group.teamIds.includes(match.homeTeam) &&
+                        group.teamIds.includes(match.awayTeam)
+                    );
+                  }
+                );
+                const allGroupMatchesPlayed =
+                  groupMatches.length > 0 &&
+                  groupMatches.every((m) => m.played);
+                return allGroupMatchesPlayed;
+              })() && (
+                <View style={styles.knockoutButtonContainer}>
+                  <TouchableOpacity
+                    style={styles.knockoutButton}
+                    onPress={async () => {
+                      Alert.alert(
+                        "⚔️ Gerar Mata-Mata",
+                        "A fase de grupos foi concluída!\n\nDeseja gerar o mata-mata com os times classificados?",
+                        [
+                          { text: "Cancelar", style: "cancel" },
+                          {
+                            text: "Gerar Mata-Mata",
+                            onPress: async () => {
+                              try {
+                                console.log(
+                                  "⚔️ Gerando mata-mata a partir dos grupos..."
+                                );
+
+                                // Atualizar fase para mata-mata
+                                const updatedChampionship: Championship = {
+                                  ...currentChampionship,
+                                  currentPhase: "mata_mata",
+                                };
+                                await updateChampionship(updatedChampionship);
+
+                                // Gerar partidas do mata-mata (sem options, usa lógica automática)
+                                await generateMatches();
+
+                                Alert.alert(
+                                  "Sucesso",
+                                  "Mata-mata gerado com os times classificados dos grupos!"
+                                );
+                              } catch (error) {
+                                console.error(
+                                  "Erro ao gerar mata-mata:",
+                                  error
+                                );
+                                Alert.alert(
+                                  "Erro",
+                                  "Erro ao gerar mata-mata. Tente novamente."
+                                );
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.knockoutButtonText}>
+                      ⚔️ Gerar Mata-Mata
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
             {currentChampionship.type === "grupos"
               ? renderMatchesByGroups()
@@ -1518,6 +1845,7 @@ const ChampionshipMatchesScreen = () => {
       <MatchGenerationConfig
         visible={showConfiguredGenerationModal}
         teams={currentChampionship?.teams || []}
+        groups={currentChampionship?.groups}
         onGenerateMatches={handleConfiguredGeneration}
         onClose={() => setShowConfiguredGenerationModal(false)}
       />
@@ -1528,6 +1856,14 @@ const ChampionshipMatchesScreen = () => {
         teams={currentChampionship?.teams || []}
         onGenerateMatches={handleDrawGeneration}
         onClose={() => setShowDrawModal(false)}
+      />
+
+      {/* Modal de Formação Manual de Grupos */}
+      <ManualGroupsModal
+        visible={showManualGroupsModal}
+        teams={currentChampionship?.teams || []}
+        onCreateGroups={handleManualGroupsCreation}
+        onClose={() => setShowManualGroupsModal(false)}
       />
 
       {/* Modal de Seleção Manual Rápida */}
@@ -1576,6 +1912,116 @@ const ChampionshipMatchesScreen = () => {
           }
         />
       )}
+
+      {/* Modal de Ajuda */}
+      <Modal
+        visible={showHelpModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHelpModal(false)}
+      >
+        <View style={styles.helpModalOverlay}>
+          <View style={styles.helpModalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.helpModalTitle}>
+                📋 Guia de Funcionalidades
+              </Text>
+
+              <Text style={styles.helpModalSubtitle}>🎯 Visão Geral</Text>
+              <Text style={styles.helpModalText}>
+                Esta é a tela de gerenciamento de partidas do campeonato. Aqui
+                você pode criar, visualizar e gerenciar todas as partidas do seu
+                campeonato.
+              </Text>
+
+              <Text style={styles.helpModalSubtitle}>🔧 Botões Principais</Text>
+
+              <View style={styles.helpItem}>
+                <Text style={styles.helpItemTitle}>⚽ Gerar Partidas</Text>
+                <Text style={styles.helpItemText}>
+                  Cria automaticamente as partidas do campeonato baseado no tipo
+                  selecionado:
+                  {"\n"}• <Text style={styles.helpBold}>Pontos Corridos:</Text>{" "}
+                  Configuração manual de rodadas e confrontos
+                  {"\n"}• <Text style={styles.helpBold}>Fase de Grupos:</Text>{" "}
+                  Opção de sortear grupos automaticamente ou formar manualmente
+                  {"\n"}• <Text style={styles.helpBold}>Mata-Mata:</Text> Gera
+                  confrontos eliminatórios ou próxima fase
+                </Text>
+              </View>
+
+              <View style={styles.helpItem}>
+                <Text style={styles.helpItemTitle}>🎲 Sortear</Text>
+                <Text style={styles.helpItemText}>
+                  Abre o modal de sorteio manual onde você pode:
+                  {"\n"}• Definir número de rodadas
+                  {"\n"}• Escolher modo de sorteio (aleatório, balanceado, por
+                  ranking)
+                  {"\n"}• Configurar regras de confrontos
+                  {"\n"}• Visualizar preview antes de confirmar
+                </Text>
+              </View>
+
+              <Text style={styles.helpModalSubtitle}>
+                🎮 Gerenciamento de Partidas
+              </Text>
+
+              <View style={styles.helpItem}>
+                <Text style={styles.helpItemTitle}>🔄 Reset</Text>
+                <Text style={styles.helpItemText}>
+                  Remove todos os sorteios e grupos, permitindo recriar do zero
+                  (mantém os times cadastrados)
+                </Text>
+              </View>
+
+              <View style={styles.helpItem}>
+                <Text style={styles.helpItemTitle}>🧹 Limpar</Text>
+                <Text style={styles.helpItemText}>
+                  Limpa apenas os resultados das partidas, mantendo os
+                  confrontos criados
+                </Text>
+              </View>
+
+              <View style={styles.helpItem}>
+                <Text style={styles.helpItemTitle}>Regerar</Text>
+                <Text style={styles.helpItemText}>
+                  Abre novamente o menu de geração de partidas para ajustes ou
+                  próximas fases
+                </Text>
+              </View>
+
+              <Text style={styles.helpModalSubtitle}>
+                📊 Registrar Resultados
+              </Text>
+              <Text style={styles.helpModalText}>
+                Toque em qualquer partida para registrar o placar:
+                {"\n"}• Adicione gols para cada time
+                {"\n"}• Selecione os artilheiros (opcional)
+                {"\n"}• Adicione cartões amarelos/vermelhos
+                {"\n"}• Salve e veja a classificação atualizar automaticamente
+              </Text>
+
+              <Text style={styles.helpModalSubtitle}>💡 Dicas</Text>
+              <Text style={styles.helpModalText}>
+                • Para <Text style={styles.helpBold}>Fase de Grupos</Text>, você
+                pode escolher entre ida e volta ou apenas ida
+                {"\n"}• Em <Text style={styles.helpBold}>Mata-Mata</Text>, após
+                registrar os resultados, use "Regerar" para criar a próxima fase
+                {"\n"}• A barra de progresso mostra quantas partidas já foram
+                realizadas
+                {"\n"}• Use "Reset" se quiser mudar a estrutura do campeonato
+              </Text>
+
+              <TouchableOpacity
+                style={styles.helpModalButton}
+                onPress={() => setShowHelpModal(false)}
+              >
+                <Text style={styles.helpModalButtonText}>Entendi!</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -2188,6 +2634,43 @@ const styles = StyleSheet.create({
     ...theme.typography.button,
     color: theme.colors.white,
   },
+  groupFormatContainer: {
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+  },
+  groupFormatLabel: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginBottom: 4,
+  },
+  groupFormatChips: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  groupFormatChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
+  },
+  groupFormatChipActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  groupFormatChipDisabled: {
+    opacity: 0.5,
+  },
+  groupFormatChipText: {
+    fontSize: 12,
+    color: theme.colors.text,
+  },
+  groupFormatChipTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
   headerButtons: {
     flexDirection: "row",
     alignItems: "center",
@@ -2432,6 +2915,146 @@ const styles = StyleSheet.create({
   },
   matchInKnockout: {
     marginBottom: theme.spacing.sm,
+  },
+  // Estilos do botão de ajuda centralizado
+  helpButtonCentered: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: 140,
+  },
+  helpButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
+  },
+  // Estilos do botão de mata-mata
+  knockoutButtonContainer: {
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    alignItems: "center",
+  },
+  knockoutButton: {
+    backgroundColor: "#ff6b35",
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: 200,
+  },
+  knockoutButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  // Estilos do modal de ajuda
+  helpModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  helpModalContent: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxHeight: "85%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  helpModalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: theme.colors.primary,
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  helpModalSubtitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  helpModalText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  helpItem: {
+    backgroundColor: theme.colors.card,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+  },
+  helpItemTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  helpItemText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    lineHeight: 20,
+  },
+  helpBold: {
+    fontWeight: "bold",
+    color: theme.colors.text,
+  },
+  helpModalButton: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  helpModalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
 

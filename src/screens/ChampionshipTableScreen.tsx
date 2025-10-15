@@ -213,15 +213,145 @@ const ChampionshipTableScreen = () => {
       })
       .filter(Boolean) as TableRow[];
 
+    // Detectar se houve desempate aplicado (ordem diferente do ordenamento apenas por pontos)
+    let tiebreakApplied = false;
+    if (groupTableData.length > 1) {
+      const byPoints = [...groupTableData].sort((a, b) => b.points - a.points);
+      // Se houver ao menos dois com os mesmos pontos e a ordem final difere da ordem por pontos, então houve desempate
+      for (let i = 0; i < groupTableData.length - 1; i++) {
+        const a = groupTableData[i];
+        const b = groupTableData[i + 1];
+        if (a.points === b.points) {
+          // Comparar sequência completa
+          const idsFinal = groupTableData.map((r) => r.team.id).join("|");
+          const idsPoints = byPoints.map((r) => r.team.id).join("|");
+          if (idsFinal !== idsPoints) {
+            tiebreakApplied = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Determinar times impactados por desempate (por blocos de pontos)
+    const impactedByTiebreak = new Set<string>();
+    if (tiebreakApplied) {
+      const byPointsMap = new Map<number, string[]>();
+      groupTableData.forEach((r) => {
+        const list = byPointsMap.get(r.points) || [];
+        list.push(r.team.id);
+        byPointsMap.set(r.points, list);
+      });
+      const finalOrder = groupTableData.map((r) => r.team.id);
+      byPointsMap.forEach((ids, pts) => {
+        if (ids.length > 1) {
+          // Ordem por pontos dentro do bloco (mantém ordem de aparição)
+          const blockFinal = finalOrder.filter((id) => ids.includes(id));
+          const blockPoints = ids; // baseline
+          if (blockFinal.join("|") !== blockPoints.join("|")) {
+            blockFinal.forEach((id) => impactedByTiebreak.add(id));
+          }
+        }
+      });
+    }
+
     return (
       <View style={styles.tableContainer}>
         {renderTableHeader()}
         <FlatList
           data={groupTableData}
-          renderItem={renderTableRow}
           keyExtractor={(item) => item.team.id}
+          renderItem={({ item, index }) => (
+            <View style={[styles.tableRow, index % 2 === 0 && styles.evenRow]}>
+              <Text
+                style={[
+                  styles.tableCell,
+                  styles.positionColumn,
+                  styles.positionText,
+                ]}
+              >
+                {item.position}
+              </Text>
+              <View style={[styles.teamColumn, styles.teamInfo]}>
+                {item.team.logo && (
+                  <Image
+                    source={{ uri: item.team.logo }}
+                    style={styles.teamLogo}
+                  />
+                )}
+                <Text style={styles.teamName} numberOfLines={1}>
+                  {item.team.name}
+                </Text>
+                {impactedByTiebreak.has(item.team.id) && (
+                  <Text
+                    style={styles.tiebreakBadge}
+                    accessibilityLabel="Desempate aplicado"
+                  >
+                    {" "}
+                    ⚖️
+                  </Text>
+                )}
+                {item.team.color && (
+                  <View
+                    style={[
+                      styles.teamColorIndicator,
+                      { backgroundColor: item.team.color },
+                    ]}
+                  />
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.tableCell,
+                  styles.numberColumn,
+                  styles.pointsText,
+                ]}
+              >
+                {item.points}
+              </Text>
+              <Text style={[styles.tableCell, styles.numberColumn]}>
+                {item.matches}
+              </Text>
+              <Text style={[styles.tableCell, styles.numberColumn]}>
+                {item.wins}
+              </Text>
+              <Text style={[styles.tableCell, styles.numberColumn]}>
+                {item.draws}
+              </Text>
+              <Text style={[styles.tableCell, styles.numberColumn]}>
+                {item.losses}
+              </Text>
+              <Text style={[styles.tableCell, styles.numberColumn]}>
+                {item.goalsFor}
+              </Text>
+              <Text style={[styles.tableCell, styles.numberColumn]}>
+                {item.goalsAgainst}
+              </Text>
+              <Text
+                style={[
+                  styles.tableCell,
+                  styles.numberColumn,
+                  item.goalDifference > 0
+                    ? styles.positiveNumber
+                    : item.goalDifference < 0
+                    ? styles.negativeNumber
+                    : styles.neutralNumber,
+                ]}
+              >
+                {item.goalDifference > 0 ? "+" : ""}
+                {item.goalDifference}
+              </Text>
+            </View>
+          )}
           scrollEnabled={false}
         />
+        {tiebreakApplied && (
+          <View style={styles.tiebreakNote}>
+            <Text style={styles.tiebreakNoteText}>
+              ℹ️ Empates em pontos foram definidos pelos critérios de desempate.
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -355,6 +485,21 @@ const ChampionshipTableScreen = () => {
                 <Text style={styles.legendItem}>GC = Gols Contra</Text>
                 <Text style={styles.legendItem}>SG = Saldo de Gols</Text>
               </View>
+            </View>
+
+            <View style={styles.tiebreakContainer}>
+              <Text style={styles.tiebreakTitle}>Critérios de desempate</Text>
+              <Text style={styles.tiebreakItem}>1) Pontos</Text>
+              <Text style={styles.tiebreakItem}>2) Vitórias</Text>
+              <Text style={styles.tiebreakItem}>3) Saldo de Gols</Text>
+              <Text style={styles.tiebreakItem}>4) Gols Pró</Text>
+              <Text style={styles.tiebreakItem}>5) Menos Gols Sofridos</Text>
+              <Text style={styles.tiebreakItem}>6) Menos Derrotas</Text>
+              <Text style={styles.tiebreakItem}>
+                7) Menos Cartões Vermelhos
+              </Text>
+              <Text style={styles.tiebreakItem}>8) Menos Cartões Amarelos</Text>
+              <Text style={styles.tiebreakItem}>9) Sorteio</Text>
             </View>
 
             {renderTopScorers()}
@@ -602,6 +747,39 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 10,
     flex: 1,
+  },
+  tiebreakContainer: {
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  tiebreakTitle: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+    fontWeight: "bold",
+    marginBottom: theme.spacing.xs,
+  },
+  tiebreakItem: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  tiebreakNote: {
+    marginTop: theme.spacing.xs,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.spacing.xs,
+  },
+  tiebreakNoteText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+  },
+  tiebreakBadge: {
+    marginLeft: 4,
+    fontSize: 12,
   },
   topScorersSection: {
     backgroundColor: theme.colors.card,

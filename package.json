@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "build:android": "eas build --platform android --profile preview",
-    "build:android:dev": "eas build --platform android --profile development"
+    "build:android:dev": "eas build --platform android --profile development",
+    "test:e2e:grupos": "node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv/config scripts/e2e-groups.ts --project tsconfig.e2e.json"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -35,7 +36,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/node": "^24.7.2",
     "@types/react": "~19.1.10",
+    "ts-node": "^10.9.2",
     "typescript": "~5.9.2"
   },
   "expo": {
